@@ -6,6 +6,8 @@ Plain Review is a single-file, browser-based chess game reviewer. Load a game, a
 
 > Made by **98** with help from AI.
 
+**Live demo: https://itz98-x.github.io/Plain-Review/**
+
 ---
 
 ## Features
@@ -44,16 +46,16 @@ Plain Review is a single-file, browser-based chess game reviewer. Load a game, a
 ## Usage
 
 ### Run it online
-Open `Plain_Review.html` in any modern browser. That's it.
+Open **https://itz98-x.github.io/Plain-Review/** in any modern browser. That's it. Nothing to install.
 
 ### Run it locally
 ```bash
 git clone https://github.com/Itz98-x/Plain-Review.git
 cd Plain-Review
 # just open the file
-open Plain_Review.html      # macOS
-xdg-open Plain_Review.html  # Linux
-start Plain_Review.html     # Windows
+open index.html      # macOS
+xdg-open index.html  # Linux
+start index.html     # Windows
 ```
 
 ### Getting a game from Lichess
