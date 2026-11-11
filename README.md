@@ -48,18 +48,13 @@ Open `Plain_Review.html` in any modern browser. That's it.
 
 ### Run it locally
 ```bash
-git clone https://github.com/<your-username>/<your-repo>.git
-cd <your-repo>
+git clone https://github.com/Itz98-x/Plain-Review.git
+cd Plain-Review
 # just open the file
 open Plain_Review.html      # macOS
 xdg-open Plain_Review.html  # Linux
 start Plain_Review.html     # Windows
 ```
-
-### Host it on GitHub Pages
-1. Rename `Plain_Review.html` to `index.html` (optional but gives a clean URL)
-2. Go to **Settings > Pages**, choose your branch and root folder, and save
-3. Your app will be live at `https://<your-username>.github.io/<your-repo>/`
 
 ### Getting a game from Lichess
 Open a game on Lichess, then **Share & export > Download PGN**. Or just paste the game link into Plain Review.
