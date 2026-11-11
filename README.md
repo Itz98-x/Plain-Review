@@ -6,7 +6,7 @@ Plain Review is a single-file, browser-based chess game reviewer. Load a game, a
 
 > Made by **98** with help from AI.
 
-**Live demo: https://itz98-x.github.io/Plain-Review/**
+**Live demo: https://itz98-x.github.io/Plain-Review/Plain_Review.html**
 
 ---
 
