@@ -1,0 +1,1370 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"></head><body>
+<title>Plain Review</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<style>
+/* Layout: loader, summary, board + coach side by side on wide screens, graph, key moments, scoresheet, share. Mobile stacks in reading order. */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --surface-2:#e5eaef; --fg:#17202a; --muted:#566471; --line:#d3dae1;
+  --accent:#2a5f9e; --accent-fg:#ffffff;
+  --sq-light:#dbe3ea; --sq-dark:#7a94aa; --coord-l:#6b8399; --coord-d:#e6edf3;
+  --graph-dark:#3a444d; --graph-light:#f3f6f8;
+  --best:#1c9560; --excellent:#2487a0; --good:#6483a3; --inaccuracy:#ad7a00; --mistake:#d4631a; --blunder:#cf3238; --book:#8b6b4a;
+  --threat:#b8282e; --threat-bg:#fbeaea;
+  --f-display:"Bricolage Grotesque",system-ui,sans-serif; --f-body:"IBM Plex Sans",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12171c; --surface:#1a2128; --surface-2:#232c35; --fg:#e8edf1; --muted:#9aa7b3; --line:#2c3640;
+  --accent:#8dbbe8; --accent-fg:#0e1a26;
+  --sq-light:#b4c0cb; --sq-dark:#5b7387; --coord-l:#5b7387; --coord-d:#e1e8ee;
+  --graph-dark:#0c1014; --graph-light:#ccd5dd; --book:#a8825a; --threat:#ff8a8f; --threat-bg:#2c1a1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12171c; --surface:#1a2128; --surface-2:#232c35; --fg:#e8edf1; --muted:#9aa7b3; --line:#2c3640;
+  --accent:#8dbbe8; --accent-fg:#0e1a26;
+  --sq-light:#b4c0cb; --sq-dark:#5b7387; --coord-l:#5b7387; --coord-d:#e1e8ee;
+  --graph-dark:#0c1014; --graph-light:#ccd5dd; --book:#a8825a; --threat:#ff8a8f; --threat-bg:#2c1a1c; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body)}
+.wrap{max-width:1080px;margin:0 auto;padding-block:20px 48px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:16px}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;letter-spacing:-.01em;line-height:1.15}
+h1{font-size:30px} h2{font-size:19px} h3{font-size:16px}
+p{margin:0}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:14px}
+.btn{font:inherit;font-weight:600;font-size:14px;border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:9px 14px;border-radius:5px;cursor:pointer;min-height:40px}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn[disabled]{opacity:.5;cursor:default}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+select,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:8px 10px}
+textarea{width:100%;min-height:120px;font-family:var(--f-mono);font-size:12px}
+
+header.top{display:flex;flex-direction:column;gap:2px}
+header.top p{color:var(--muted)}
+
+.loader{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.loader .hint{font-size:13px;color:var(--muted)}
+.paste{display:flex;flex-direction:column;gap:8px}
+.note{font-size:14px;padding:10px 12px;border-radius:5px;background:var(--surface-2);border-left:3px solid var(--accent)}
+.note.err{border-left-color:var(--blunder)}
+.prog{height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.prog>div{height:100%;background:var(--accent);width:0;transition:width .25s}
+.progtxt{font-size:13px;color:var(--muted)}
+
+.sumgrid{display:grid;gap:16px;grid-template-columns:minmax(0,1fr)}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{font:inherit;font-size:13px;background:var(--surface);color:var(--fg);border:0;padding:8px 10px;cursor:pointer;text-align:left;min-width:0;overflow-wrap:anywhere}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg)}
+.players{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.pl{border:1px solid var(--line);border-radius:5px;padding:10px;min-width:0}
+.pl.me{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.pl .who{display:flex;gap:8px;align-items:center;font-weight:600;min-width:0}
+.pl .who span.nm{overflow-wrap:anywhere}
+.sw{width:14px;height:14px;border:1.5px solid var(--fg);flex:none}
+.sw.w{background:#fff}.sw.b{background:#1c2127}
+.pl .elo{font-size:12px;color:var(--muted)}
+.acc{font-family:var(--f-mono);font-size:32px;font-weight:500;line-height:1.1;margin-top:6px}
+.acc small{font-size:12px;color:var(--muted);font-family:var(--f-body)}
+.verdict{display:flex;flex-direction:column;gap:6px;margin-top:12px}
+.verdict h2{font-size:21px}
+.counts{display:grid;grid-template-columns:1fr auto auto;column-gap:22px;row-gap:5px;align-items:center;font-size:14px}
+.counts .h{font-size:12px;color:var(--muted);text-align:right}
+.counts .n{font-family:var(--f-mono);text-align:right}
+.counts .lb{display:flex;gap:8px;align-items:center}
+
+.sy{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 3px;border-radius:10px;background:var(--c);color:#fff;font-size:11px;font-weight:700;font-family:var(--f-body);line-height:1}
+.L-best{--c:var(--best)}.L-excellent{--c:var(--excellent)}.L-good{--c:var(--good)}.L-inaccuracy{--c:var(--inaccuracy)}.L-mistake{--c:var(--mistake)}.L-blunder{--c:var(--blunder)}.L-book{--c:var(--book)}.L-none{--c:var(--accent)}
+
+.stage{display:grid;gap:16px;grid-template-columns:minmax(0,1fr);grid-template-areas:"board" "coach" "graph" "key" "moves"}
+.a-board{grid-area:board}.a-coach{grid-area:coach}.a-graph{grid-area:graph}.a-key{grid-area:key}.a-moves{grid-area:moves}
+.boardrow{display:flex;gap:8px;align-items:stretch}
+.evalbar{width:20px;flex:none;position:relative;background:var(--graph-dark);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.evalbar .w{position:absolute;left:0;right:0;background:var(--graph-light);transition:height .3s}
+.evalbar .w.bot{bottom:0}.evalbar .w.top{top:0}
+#board{display:block;flex:1;min-width:0;width:100%;height:auto;border-radius:3px;touch-action:manipulation}
+#board.playing{cursor:pointer}
+.sqL{fill:var(--sq-light)}.sqD{fill:var(--sq-dark)}
+.cl{fill:var(--coord-l);font:600 2.5px var(--f-body)}.cd{fill:var(--coord-d);font:600 2.5px var(--f-body)}
+.hl{fill:var(--c);opacity:.42}
+.selsq{fill:var(--accent);opacity:.5}
+.dot{fill:var(--accent);opacity:.7}
+.ring{fill:none;stroke:var(--accent);stroke-width:.9;opacity:.8}
+.pc{font-family:"Noto Sans Symbols 2","Segoe UI Symbol","Apple Symbols","DejaVu Sans","Arial Unicode MS",sans-serif;font-size:8.8px;text-anchor:middle;paint-order:stroke;stroke-linejoin:round;user-select:none;pointer-events:none}
+.pw{fill:#fff;stroke:#1d242b;stroke-width:.6px}.pb{fill:#1b2026;stroke:#dfe5ea;stroke-width:.25px}
+.arrow{stroke:var(--best);stroke-width:2.1;stroke-linecap:round;opacity:.85;fill:none}
+.arrowhead{fill:var(--best);opacity:.85}
+.arrow.thr{stroke:var(--blunder);stroke-dasharray:3.2 2.2}
+.arrowhead.thr{fill:var(--blunder)}
+.bdg{fill:var(--c);stroke:#fff;stroke-width:.35}
+.bdt{fill:#fff;font:700 3px var(--f-body);text-anchor:middle}
+.ctrl{display:flex;gap:6px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.ctrl .btn{padding:8px 0;width:46px;font-size:17px;font-family:var(--f-mono)}
+.ctrl .btn.wide{width:auto;padding:8px 12px;font-family:var(--f-body);font-size:13px}
+.ctrl .btn.play{width:84px;font-family:var(--f-body);font-size:13px}
+.ctrl .sp{flex:1}
+.ctrl label{font-size:13px;display:flex;gap:6px;align-items:center;color:var(--muted);cursor:pointer}
+.ctrl select{padding:6px 8px;font-size:13px}
+.cap{font-family:var(--f-mono);font-size:13px;color:var(--muted);margin-top:8px}
+
+.coach{display:flex;flex-direction:column;gap:10px;min-height:200px}
+.coach .top{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.coach .mvname{font-family:var(--f-mono);font-size:20px;font-weight:600}
+.chip{display:inline-flex;gap:7px;align-items:center;font-weight:600;font-size:13px;padding:3px 10px 3px 4px;border:1px solid var(--line);border-radius:99px}
+.coach h2{font-size:20px}
+.coach .parts{display:flex;flex-direction:column;gap:8px}
+.coach .better{border:1px solid var(--best);border-radius:5px;padding:8px 10px;font-size:14px}
+.coach .threat{border:1px solid var(--threat);background:var(--threat-bg);border-radius:5px;padding:8px 10px;font-size:14px;display:flex;flex-direction:column;gap:4px}
+.coach .threat b{color:var(--threat);font-family:var(--f-display);letter-spacing:.02em}
+.coach .tip{font-size:13px;color:var(--muted);border-top:1px solid var(--line);padding-top:8px}
+.coach .acts{display:flex;gap:8px;flex-wrap:wrap}
+.coach .acts .btn{font-size:13px;min-height:36px;padding:6px 12px}
+.evline{font-size:13px;color:var(--muted);font-family:var(--f-mono)}
+.line{font-family:var(--f-mono);font-size:13px;display:flex;flex-wrap:wrap;gap:4px 8px}
+.line span.q{font-weight:700}
+.popts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+
+#graph{display:block;width:100%;height:auto;touch-action:pan-y;cursor:pointer;border-radius:3px}
+.gl{font-size:12px;color:var(--muted);margin-top:6px}
+
+.key{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+.key button{font:inherit;text-align:left;background:var(--surface);color:var(--fg);border:1px solid var(--line);border-radius:5px;padding:9px 11px;cursor:pointer;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:center}
+.key button:hover{border-color:var(--accent)}
+.key .kd{grid-column:1/-1;font-size:13px;color:var(--muted)}
+.key .kn{font-family:var(--f-mono);font-weight:600}
+
+.moves{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 18px;margin-top:10px}
+.mrow{display:grid;grid-template-columns:34px 1fr 1fr;align-items:center}
+.mrow .mn{font-family:var(--f-mono);font-size:12px;color:var(--muted)}
+.mvb{font:inherit;font-family:var(--f-mono);font-size:14px;background:none;border:0;padding:7px 8px;text-align:left;border-radius:4px;cursor:pointer;color:var(--fg);display:flex;gap:5px;align-items:center;min-width:0}
+.mvb:hover{background:var(--surface-2)}
+.mvb.on{background:var(--accent);color:var(--accent-fg)}
+.mvb .q{font-weight:700;font-size:12px;color:var(--c)}
+.mvb.on .q{color:var(--accent-fg)}
+.mvb.bk{color:var(--muted)}
+.mvb.on.bk{color:var(--accent-fg)}
+
+.share h3{margin-bottom:4px}
+.sharegrid{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.sharegrid a.btn{text-decoration:none;display:inline-flex;align-items:center}
+.sharemsg{font-size:13px;color:var(--muted);margin-top:8px;min-height:20px}
+#shareOut{margin-top:8px;min-height:140px}
+
+.legend dl{display:grid;grid-template-columns:auto 1fr;gap:8px 12px;margin:10px 0 0;align-items:center}
+.legend dt{display:flex;gap:8px;align-items:center;font-weight:600}
+.legend dd{margin:0;font-size:14px;color:var(--muted)}
+details summary{cursor:pointer;font-weight:600}
+
+@media (min-width:920px){
+  .stage{grid-template-columns:minmax(0,540px) minmax(0,1fr);grid-template-areas:"board coach" "graph key" "moves moves";align-items:start}
+  .sumgrid{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);align-items:start}
+}
+@media (prefers-reduced-motion:reduce){.evalbar .w,.prog>div{transition:none}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <h1>Plain Review</h1>
+    <p>Drop in a Lichess game and get it explained in plain English, move by move.</p>
+  </header>
+
+  <section class="card loader" aria-label="Load a game">
+    <div class="row">
+      <label class="btn primary" for="file" style="display:inline-flex;align-items:center">Choose PGN file</label>
+      <input id="file" type="file" accept=".pgn,.txt,text/plain" hidden>
+      <button class="btn" id="pasteBtn" type="button">Paste PGN</button>
+      <button class="btn" id="sampleBtn" type="button">Sample game</button>
+      <label class="muted" style="font-size:13px;display:flex;gap:6px;align-items:center" for="depth">Analysis
+        <select id="depth"><option value="10">Quick</option><option value="12" selected>Standard</option><option value="15">Deep</option></select>
+      </label>
+      <button class="btn" id="rerun" type="button" disabled>Analyze again</button>
+    </div>
+    <div class="paste" id="pastePanel" hidden>
+      <textarea id="pasteText" placeholder="Paste the PGN text or a Lichess game link here" aria-label="PGN text"></textarea>
+      <div class="row"><button class="btn primary" id="pasteGo" type="button">Review this game</button></div>
+    </div>
+    <div class="row" id="pickRow" hidden>
+      <label class="muted" style="font-size:13px" for="gamepick">Game in file</label>
+      <select id="gamepick" style="max-width:100%"></select>
+    </div>
+    <p class="hint">On Lichess, open a game, then Share &amp; export, then Download PGN. If the game has computer analysis, it loads right away. Otherwise several engines run side by side in your browser. You can also drop a file anywhere on this page, or paste a Lichess game link.</p>
+    <div id="note" aria-live="polite" hidden></div>
+    <div id="progWrap" hidden><div class="prog"><div id="progBar"></div></div><p class="progtxt" id="progTxt"></p></div>
+  </section>
+
+  <section class="card" id="summary" aria-label="Game summary"></section>
+
+  <div class="stage">
+    <section class="a-board">
+      <div class="boardrow"><div class="evalbar" id="evalbar" aria-hidden="true"><div class="w bot" id="evalfill"></div></div><svg id="board" viewBox="0 0 80 80" role="img" aria-label="Chess board"></svg></div>
+      <div class="ctrl" id="navRow">
+        <button class="btn" id="bStart" aria-label="Go to start">|&lsaquo;</button>
+        <button class="btn" id="bPrev" aria-label="Previous move">&lsaquo;</button>
+        <button class="btn primary play" id="bPlay" type="button" aria-label="Play the game automatically">&#9654; Play</button>
+        <button class="btn" id="bNext" aria-label="Next move">&rsaquo;</button>
+        <button class="btn" id="bEnd" aria-label="Go to end">&rsaquo;|</button>
+        <span class="sp"></span>
+        <button class="btn wide" id="bFlip" aria-label="Flip board">Flip</button>
+      </div>
+      <div class="ctrl" style="margin-top:4px">
+        <label for="speed">Speed
+          <select id="speed"><option value="3000">Slow</option><option value="1800" selected>Normal</option><option value="900">Fast</option></select>
+        </label>
+        <label for="pauseChk"><input type="checkbox" id="pauseChk" checked> Stop at my mistakes</label>
+      </div>
+      <div class="ctrl" style="margin-top:0">
+        <label for="arrowChk"><input type="checkbox" id="arrowChk" checked> Better move arrow</label>
+        <label for="threatChk"><input type="checkbox" id="threatChk" checked> Threat arrows</label>
+      </div>
+      <div class="cap" id="cap"></div>
+    </section>
+
+    <section class="card coach a-coach" id="coach" aria-live="polite"></section>
+
+    <section class="card a-graph">
+      <h3>Who was ahead</h3>
+      <svg id="graph" viewBox="0 0 400 110" role="img" aria-label="Evaluation graph. Tap or drag to jump to a move." style="margin-top:10px"></svg>
+      <p class="gl">Higher line means White is ahead, lower means Black is ahead. Dots mark your slips. The tan strip is opening book. Tap or drag to jump.</p>
+    </section>
+
+    <section class="card a-key" id="keyCard"></section>
+
+    <section class="card a-moves">
+      <h3>Scoresheet</h3>
+      <div class="moves" id="moves"></div>
+    </section>
+  </div>
+
+  <section class="card share" id="shareCard" aria-label="Share and export">
+    <h3>Share and export</h3>
+    <p class="muted" style="font-size:14px">Copy a plain-English summary to send to a friend or coach, or take the annotated game to Lichess, ChessBase or any chess app.</p>
+    <div class="sharegrid">
+      <button class="btn" id="shSummary" type="button">Copy summary</button>
+      <button class="btn" id="shPgn" type="button">Copy annotated PGN</button>
+      <button class="btn" id="shFen" type="button">Copy this position (FEN)</button>
+      <button class="btn" id="shSave" type="button" hidden>Save PGN file</button>
+      <a class="btn" id="shLichess" href="#" target="_blank" rel="noopener" hidden>Open on Lichess</a>
+    </div>
+    <p class="sharemsg" id="shareMsg" aria-live="polite"></p>
+    <textarea id="shareOut" readonly hidden aria-label="Text to copy"></textarea>
+  </section>
+
+  <section class="card legend">
+    <details>
+      <summary>What do the labels mean?</summary>
+      <dl id="legend"></dl>
+      <p class="muted" style="font-size:14px;margin-top:12px">Winning chances is how likely a player is to win from a position, from 0 to 100. Every label comes from how many points of winning chances a move gives away. Accuracy is the average quality of a player's moves, out of 100. Book moves are standard opening theory and are left out of accuracy.</p>
+    </details>
+  </section>
+</div>
+
+<script>
+(function(){
+"use strict";
+var $=function(id){return document.getElementById(id)};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var PN={p:'pawn',n:'knight',b:'bishop',r:'rook',q:'queen',k:'king'};
+var VAL={p:1,n:3,b:3,r:5,q:9,k:100};
+var GL={k:'♚︎',q:'♛︎',r:'♜︎',b:'♝︎',n:'♞︎',p:'♟︎'};
+var LABELS=[
+ {key:'book',name:'Book',sym:'Bk',desc:'A standard opening move that players have used for years.'},
+ {key:'best',name:'Best',sym:'★',desc:'The strongest move in the position.'},
+ {key:'excellent',name:'Excellent',sym:'!',desc:'Almost as good as the best move.'},
+ {key:'good',name:'Good',sym:'✓',desc:'A fine, safe move.'},
+ {key:'inaccuracy',name:'Inaccuracy',sym:'?!',desc:'Not terrible, but a better move existed.'},
+ {key:'mistake',name:'Mistake',sym:'?',desc:'Gives away a real chunk of your advantage.'},
+ {key:'blunder',name:'Blunder',sym:'??',desc:'A serious error that can lose material or the game.'}
+];
+var LBL={};LABELS.forEach(function(l){LBL[l.key]=l});
+var SAMPLE='[Event "Paris Opera House"]\n[Site "Paris FRA"]\n[Date "1858.??.??"]\n[White "Paul Morphy"]\n[Black "Duke Karl and Count Isouard"]\n[Result "1-0"]\n\n1. e4 e5 2. Nf3 d6 3. d4 Bg4 4. dxe5 Bxf3 5. Qxf3 dxe5 6. Bc4 Nf6 7. Qb3 Qe7 8. Nc3 c6 9. Bg5 b5 10. Nxb5 cxb5 11. Bxb5+ Nbd7 12. O-O-O Rd8 13. Rxd7 Rxd7 14. Rd1 Qe6 15. Bxd7+ Nxd7 16. Qb8+ Nxb8 17. Rd8# 1-0';
+var SF_URLS=['https://cdnjs.cloudflare.com/ajax/libs/stockfish.js/10.0.2/stockfish.js','https://cdn.jsdelivr.net/npm/stockfish.js@10.0.2/stockfish.js'];
+/* shorter think times than before: several engines run side by side, so the same depth finishes much sooner */
+var MOVETIME={10:700,12:1200,15:3000};
+var PO_MOVETIME=900;
+var DOWNLOADS=null;
+
+var S={games:[],gi:0,game:null,me:'w',ply:0,ev:[],best:[],mode:'engine',run:0,analyzing:false,flip:false,showArrow:true,showThreat:true,engineFail:false,doneCount:0,total:0,sample:false,basic:false,
+  auto:{on:false,t:null},po:null,t0:0};
+
+/* ---------- math ---------- */
+function cpOf(e){if(e.mate!=null)return e.mate>0?1000:-1000;return Math.max(-1000,Math.min(1000,e.cp))}
+function winW(e){return 50+50*(2/(1+Math.exp(-0.00368208*cpOf(e)))-1)}
+function winFor(e,c){var w=winW(e);return c==='w'?w:100-w}
+function moveAcc(l){return Math.max(0,Math.min(100,103.1668*Math.exp(-0.04354*l)-3.1669))}
+function fmtEval(e){if(!e)return '…';if(e.term==='mate')return 'Mate';if(e.term==='draw')return '0.0';if(e.mate!=null)return (e.mate>0?'+':'−')+'M'+Math.abs(e.mate);return (e.cp>=0?'+':'−')+Math.abs(e.cp/100).toFixed(1)}
+function posWord(wp){if(wp>=80)return 'winning';if(wp>=62)return 'better';if(wp>=54)return 'slightly better';if(wp>46)return 'about equal';if(wp>=38)return 'slightly worse';if(wp>=20)return 'worse';return 'losing'}
+function evalSentence(e){if(!e)return '';if(e.term==='mate')return 'Checkmate';if(e.term==='draw')return 'Draw';var w=winW(e);if(w>46&&w<54)return 'About equal';if(w>=54)return 'White is '+posWord(w);return 'Black is '+posWord(100-w)}
+function keyOf(fen){return fen.split(' ').slice(0,3).join(' ')}
+function clkStr(s){var h=Math.floor(s/3600),m=Math.floor(s%3600/60),x=s%60;return h+':'+('0'+m).slice(-2)+':'+(x<10?'0':'')+(Math.round(x*10)/10)}
+
+/* ---------- opening book (compact, built once from move lists) ---------- */
+var BOOK_LINES=[
+"King's Pawn Game|e4 e5","King's Knight Opening|e4 e5 Nf3","Ruy Lopez|e4 e5 Nf3 Nc6 Bb5","Ruy Lopez: Berlin Defense|e4 e5 Nf3 Nc6 Bb5 Nf6",
+"Ruy Lopez: Berlin Defense, Endgame|e4 e5 Nf3 Nc6 Bb5 Nf6 O-O Nxe4 d4 Nd6 Bxc6 dxc6 dxe5 Nf5 Qxd8+ Kxd8",
+"Ruy Lopez: Classical Defense|e4 e5 Nf3 Nc6 Bb5 Bc5","Ruy Lopez: Steinitz Defense|e4 e5 Nf3 Nc6 Bb5 d6","Ruy Lopez: Schliemann Defense|e4 e5 Nf3 Nc6 Bb5 f5",
+"Ruy Lopez: Morphy Defense|e4 e5 Nf3 Nc6 Bb5 a6","Ruy Lopez: Exchange Variation|e4 e5 Nf3 Nc6 Bb5 a6 Bxc6","Ruy Lopez: Morphy Defense|e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O",
+"Ruy Lopez: Closed Variation|e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O",
+"Ruy Lopez: Closed, Chigorin Variation|e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Be7 Re1 b5 Bb3 d6 c3 O-O h3 Na5 Bc2 c5 d4 Qc7",
+"Ruy Lopez: Open Variation|e4 e5 Nf3 Nc6 Bb5 a6 Ba4 Nf6 O-O Nxe4 d4 b5 Bb3 d5 dxe5 Be6",
+"Italian Game|e4 e5 Nf3 Nc6 Bc4","Italian Game: Giuoco Piano|e4 e5 Nf3 Nc6 Bc4 Bc5","Italian Game: Giuoco Pianissimo|e4 e5 Nf3 Nc6 Bc4 Bc5 c3 Nf6 d3 d6 O-O O-O",
+"Evans Gambit|e4 e5 Nf3 Nc6 Bc4 Bc5 b4","Italian Game: Two Knights Defense|e4 e5 Nf3 Nc6 Bc4 Nf6","Italian Game: Two Knights, Knight Attack|e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5",
+"Italian Game: Fried Liver Attack|e4 e5 Nf3 Nc6 Bc4 Nf6 Ng5 d5 exd5 Nxd5 Nxf7",
+"Four Knights Game|e4 e5 Nf3 Nc6 Nc3 Nf6","Four Knights Game: Scotch Variation|e4 e5 Nf3 Nc6 Nc3 Nf6 d4","Four Knights Game: Spanish Variation|e4 e5 Nf3 Nc6 Nc3 Nf6 Bb5",
+"Three Knights Game|e4 e5 Nf3 Nc6 Nc3","Ponziani Opening|e4 e5 Nf3 Nc6 c3",
+"Scotch Game|e4 e5 Nf3 Nc6 d4 exd4 Nxd4","Scotch Game: Classical Variation|e4 e5 Nf3 Nc6 d4 exd4 Nxd4 Bc5","Scotch Gambit|e4 e5 Nf3 Nc6 d4 exd4 Bc4","Goering Gambit|e4 e5 Nf3 Nc6 d4 exd4 c3",
+"Petrov's Defense|e4 e5 Nf3 Nf6","Petrov's Defense: Classical Attack|e4 e5 Nf3 Nf6 Nxe5 d6 Nf3 Nxe4 d4 d5 Bd3 Bd6 O-O O-O","Petrov's Defense: Modern Attack|e4 e5 Nf3 Nf6 d4",
+"Stafford Gambit|e4 e5 Nf3 Nf6 Nxe5 Nc6","Philidor Defense|e4 e5 Nf3 d6","Philidor Defense: Paulsen Attack|e4 e5 Nf3 d6 Bc4","Philidor Defense: Hanham Variation|e4 e5 Nf3 d6 d4 Nd7",
+"Philidor Defense: Bg4 Variation|e4 e5 Nf3 d6 d4 Bg4 dxe5 Bxf3 Qxf3 dxe5 Bc4 Nf6 Qb3",
+"Latvian Gambit|e4 e5 Nf3 f5","Elephant Gambit|e4 e5 Nf3 d5",
+"King's Gambit|e4 e5 f4","King's Gambit Accepted|e4 e5 f4 exf4","King's Gambit Accepted: Kieseritzky Gambit|e4 e5 f4 exf4 Nf3 g5 h4 g4 Ne5","King's Gambit Declined: Falkbeer Countergambit|e4 e5 f4 d5",
+"Vienna Game|e4 e5 Nc3","Vienna Game: Vienna Gambit|e4 e5 Nc3 Nf6 f4","Vienna Game: Frankenstein-Dracula Variation|e4 e5 Nc3 Nf6 Bc4 Nxe4",
+"Bishop's Opening|e4 e5 Bc4","Center Game|e4 e5 d4 exd4 Qxd4","Danish Gambit|e4 e5 d4 exd4 c3",
+"Sicilian Defense|e4 c5","Sicilian Defense: Smith-Morra Gambit|e4 c5 d4 cxd4 c3","Sicilian Defense: Alapin Variation|e4 c5 c3","Sicilian Defense: Closed|e4 c5 Nc3",
+"Sicilian Defense: Grand Prix Attack|e4 c5 Nc3 Nc6 f4","Sicilian Defense: Open|e4 c5 Nf3","Sicilian Defense: Old Sicilian|e4 c5 Nf3 Nc6",
+"Sicilian Defense: Rossolimo Variation|e4 c5 Nf3 Nc6 Bb5","Sicilian Defense: Sveshnikov Variation|e4 c5 Nf3 Nc6 d4 cxd4 Nxd4 Nf6 Nc3 e5 Ndb5 d6",
+"Sicilian Defense: O'Kelly Variation|e4 c5 Nf3 a6","Sicilian Defense: Nimzowitsch Variation|e4 c5 Nf3 Nf6","Sicilian Defense: French Variation|e4 c5 Nf3 e6",
+"Sicilian Defense: Kan Variation|e4 c5 Nf3 e6 d4 cxd4 Nxd4 a6","Sicilian Defense: Taimanov Variation|e4 c5 Nf3 e6 d4 cxd4 Nxd4 Nc6",
+"Sicilian Defense: Modern Variations|e4 c5 Nf3 d6","Sicilian Defense: Canal Attack|e4 c5 Nf3 d6 Bb5+","Sicilian Defense: Open, Main Line|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3",
+"Sicilian Defense: Najdorf Variation|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6",
+"Sicilian Defense: Najdorf, English Attack|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Be3 e5 Nb3 Be6 f3 Be7 Qd2 O-O",
+"Sicilian Defense: Najdorf, Poisoned Pawn|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 a6 Bg5 e6 f4 Qb6",
+"Sicilian Defense: Dragon Variation|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6","Sicilian Defense: Dragon, Yugoslav Attack|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 g6 Be3 Bg7 f3 O-O Qd2 Nc6",
+"Sicilian Defense: Scheveningen Variation|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 e6","Sicilian Defense: Richter-Rauzer Attack|e4 c5 Nf3 d6 d4 cxd4 Nxd4 Nf6 Nc3 Nc6 Bg5",
+"French Defense|e4 e6","French Defense: Advance Variation|e4 e6 d4 d5 e5","French Defense: Advance, Nimzowitsch Attack|e4 e6 d4 d5 e5 c5 c3 Nc6 Nf3 Qb6",
+"French Defense: Exchange Variation|e4 e6 d4 d5 exd5","French Defense: Tarrasch Variation|e4 e6 d4 d5 Nd2","French Defense: Rubinstein Variation|e4 e6 d4 d5 Nc3 dxe4",
+"French Defense: Classical Variation|e4 e6 d4 d5 Nc3 Nf6","French Defense: Steinitz Variation|e4 e6 d4 d5 Nc3 Nf6 e5 Nfd7","French Defense: Winawer Variation|e4 e6 d4 d5 Nc3 Bb4",
+"French Defense: Winawer, Advance Variation|e4 e6 d4 d5 Nc3 Bb4 e5 c5 a3 Bxc3+ bxc3 Ne7",
+"Caro-Kann Defense|e4 c6","Caro-Kann Defense: Two Knights Attack|e4 c6 Nc3 d5 Nf3","Caro-Kann Defense: Advance Variation|e4 c6 d4 d5 e5","Caro-Kann Defense: Exchange Variation|e4 c6 d4 d5 exd5 cxd5",
+"Caro-Kann Defense: Panov-Botvinnik Attack|e4 c6 d4 d5 exd5 cxd5 c4","Caro-Kann Defense: Main Line|e4 c6 d4 d5 Nc3 dxe4 Nxe4","Caro-Kann Defense: Karpov Variation|e4 c6 d4 d5 Nc3 dxe4 Nxe4 Nd7",
+"Caro-Kann Defense: Classical Variation|e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5","Caro-Kann Defense: Classical, Main Line|e4 c6 d4 d5 Nc3 dxe4 Nxe4 Bf5 Ng3 Bg6 h4 h6 Nf3 Nd7",
+"Scandinavian Defense|e4 d5","Scandinavian Defense: Main Line|e4 d5 exd5 Qxd5 Nc3 Qa5","Scandinavian Defense: Modern Variation|e4 d5 exd5 Nf6",
+"Alekhine's Defense|e4 Nf6","Alekhine's Defense: Four Pawns Attack|e4 Nf6 e5 Nd5 d4 d6 c4 Nb6 f4","Alekhine's Defense: Modern Variation|e4 Nf6 e5 Nd5 d4 d6 Nf3",
+"Modern Defense|e4 g6","Pirc Defense|e4 d6 d4 Nf6 Nc3","Pirc Defense: Austrian Attack|e4 d6 d4 Nf6 Nc3 g6 f4","Pirc Defense: Classical Variation|e4 d6 d4 Nf6 Nc3 g6 Nf3 Bg7 Be2 O-O O-O",
+"Nimzowitsch Defense|e4 Nc6","Owen's Defense|e4 b6",
+"Queen's Pawn Game|d4 d5","London System|d4 d5 Bf4","London System|d4 d5 Nf3 Nf6 Bf4","London System|d4 Nf6 Nf3 d5 Bf4 e6 e3 Bd6","Veresov Attack|d4 d5 Nc3 Nf6 Bg5",
+"Queen's Pawn Game: Zukertort Variation|d4 d5 Nf3 Nf6","Blackmar-Diemer Gambit|d4 d5 e4 dxe4 Nc3 Nf6 f3","Colle System|d4 d5 Nf3 Nf6 e3 e6 Bd3 c5 b3 Nc6 O-O Bd6",
+"Queen's Gambit|d4 d5 c4","Queen's Gambit Declined: Chigorin Defense|d4 d5 c4 Nc6","Albin Countergambit|d4 d5 c4 e5",
+"Queen's Gambit Accepted|d4 d5 c4 dxc4","Queen's Gambit Accepted: Main Line|d4 d5 c4 dxc4 Nf3 Nf6 e3 e6 Bxc4 c5 O-O a6",
+"Queen's Gambit Declined|d4 d5 c4 e6","Queen's Gambit Declined: Exchange Variation|d4 d5 c4 e6 Nc3 Nf6 cxd5 exd5 Bg5","Queen's Gambit Declined: Classical Variation|d4 d5 c4 e6 Nc3 Nf6 Nf3 Be7 Bf4 O-O e3",
+"Queen's Gambit Declined: Tartakower Variation|d4 d5 c4 e6 Nc3 Nf6 Bg5 Be7 e3 O-O Nf3 h6 Bh4 b6",
+"Semi-Slav Defense|d4 d5 c4 c6 Nf3 Nf6 Nc3 e6","Semi-Slav Defense: Botvinnik System|d4 d5 c4 c6 Nf3 Nf6 Nc3 e6 Bg5 dxc4 e4 b5",
+"Slav Defense|d4 d5 c4 c6","Slav Defense: Exchange Variation|d4 d5 c4 c6 cxd5 cxd5","Slav Defense: Main Line|d4 d5 c4 c6 Nf3 Nf6 Nc3 dxc4 a4 Bf5 e3 e6 Bxc4 Bb4",
+"Trompowsky Attack|d4 Nf6 Bg5","Torre Attack|d4 Nf6 Nf3 e6 Bg5","Indian Defense|d4 Nf6","Indian Defense: Normal Variation|d4 Nf6 c4",
+"Catalan Opening|d4 Nf6 c4 e6 g3","Catalan Opening: Open Defense|d4 Nf6 c4 e6 g3 d5 Bg2 dxc4 Nf3",
+"Nimzo-Indian Defense|d4 Nf6 c4 e6 Nc3 Bb4","Nimzo-Indian Defense: Classical Variation|d4 Nf6 c4 e6 Nc3 Bb4 Qc2","Nimzo-Indian Defense: Rubinstein System|d4 Nf6 c4 e6 Nc3 Bb4 e3 O-O Bd3 d5 Nf3 c5 O-O Nc6",
+"Queen's Indian Defense|d4 Nf6 c4 e6 Nf3 b6","Queen's Indian Defense: Fianchetto Variation|d4 Nf6 c4 e6 Nf3 b6 g3 Ba6",
+"King's Indian Defense|d4 Nf6 c4 g6","King's Indian Defense: Normal Variation|d4 Nf6 c4 g6 Nc3 Bg7 e4 d6","King's Indian Defense: Samisch Variation|d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 f3",
+"King's Indian Defense: Classical Variation|d4 Nf6 c4 g6 Nc3 Bg7 e4 d6 Nf3 O-O Be2 e5 O-O Nc6 d5 Ne7","King's Indian Defense: Fianchetto Variation|d4 Nf6 c4 g6 g3 Bg7 Bg2 O-O Nc3 d6 Nf3",
+"Neo-Gruenfeld Defense|d4 Nf6 c4 g6 f3 d5","Gruenfeld Defense|d4 Nf6 c4 g6 Nc3 d5","Gruenfeld Defense: Exchange Variation|d4 Nf6 c4 g6 Nc3 d5 cxd5 Nxd5 e4 Nxc3 bxc3 Bg7","Gruenfeld Defense: Three Knights Variation|d4 Nf6 c4 g6 Nc3 d5 Nf3 Bg7",
+"Benko Gambit|d4 Nf6 c4 c5 d5 b5","Benoni Defense|d4 Nf6 c4 c5 d5 e6","Benoni Defense: Classical Variation|d4 Nf6 c4 c5 d5 e6 Nc3 exd5 cxd5 d6 e4 g6 Nf3 Bg7","Old Benoni Defense|d4 c5",
+"Budapest Gambit|d4 Nf6 c4 e5","Englund Gambit|d4 e5","Dutch Defense|d4 f5","Dutch Defense: Staunton Gambit|d4 f5 e4","Dutch Defense: Leningrad Variation|d4 f5 g3 Nf6 Bg2 g6","Dutch Defense: Stonewall Variation|d4 f5 c4 Nf6 g3 e6 Bg2 d5",
+"English Opening|c4","English Opening: Reversed Sicilian|c4 e5","English Opening: Carls-Bremen System|c4 e5 Nc3 Nf6","English Opening: Symmetrical Variation|c4 c5","English Opening: Anglo-Indian Defense|c4 Nf6","English Opening: Agincourt Defense|c4 e6",
+"Reti Opening|Nf3","Reti Opening: Zukertort Variation|Nf3 d5","Reti Opening: Advance Variation|Nf3 d5 c4","King's Indian Attack|Nf3 d5 g3 Nf6 Bg2",
+"Bird Opening|f4","Bird Opening: From's Gambit|f4 e5 fxe5 d6","Grob Opening|g4","Polish Opening|b4","Van't Kruijs Opening|e3","Mieses Opening|d3","Nimzowitsch-Larsen Attack|b3","Hungarian Opening|g3"
+];
+var BOOK_SET={},BOOK_NAME={},BOOK_BUILT=false;
+function buildBook(){
+  if(BOOK_BUILT)return;BOOK_BUILT=true;
+  BOOK_LINES.forEach(function(line){
+    var p=line.split('|'),name=p[0],mvs=p[1].split(' '),g=new Chess(),ok=true,i;
+    BOOK_SET[keyOf(g.fen())]=true;
+    for(i=0;i<mvs.length;i++){
+      if(!g.move(mvs[i],{sloppy:true})){ok=false;break}
+      BOOK_SET[keyOf(g.fen())]=true;
+    }
+    if(ok&&!BOOK_NAME[keyOf(g.fen())])BOOK_NAME[keyOf(g.fen())]=name;
+  });
+}
+function computeBook(g){
+  buildBook();
+  g.bookN=0;g.bookNames=[];g.openName='';
+  if(g.headers.FEN||!g.moves.length){g.openName=g.headers.Opening&&g.headers.Opening!=='?'?g.headers.Opening:'';return}
+  var k,key,last='';
+  for(k=1;k<=g.moves.length;k++){
+    key=keyOf(g.moves[k-1].fenAfter);
+    if(!BOOK_SET[key])break;
+    g.bookN=k;
+    if(BOOK_NAME[key])last=BOOK_NAME[key];
+    g.bookNames[k]=last;
+  }
+  g.openName=last||(g.headers.Opening&&g.headers.Opening!=='?'?g.headers.Opening:'');
+}
+function isBook(k){return !!S.game&&k>=1&&k<=S.game.bookN}
+
+/* ---------- PGN ---------- */
+function splitGames(text){
+  text=text.replace(/\r\n?/g,'\n').trim();
+  var parts=text.split(/\n(?=\[Event\s)/);
+  return parts.map(function(t){return t.trim()}).filter(function(t){return t.length>0});
+}
+function parseGame(text){
+  var headers={};
+  text.replace(/\[(\w+)\s+"((?:[^"\\]|\\.)*)"\]/g,function(m,k,v){headers[k]=v;return m});
+  if(headers.Variant&&!/^standard$/i.test(headers.Variant)){return {headers:headers,moves:[],error:'This is a "'+headers.Variant+'" game. Plain Review only supports standard chess.'}}
+  var body=text.split('\n').filter(function(l){return !/^\s*\[\w+\s+"/.test(l)}).join('\n');
+  var g;try{g=headers.FEN?new Chess(headers.FEN):new Chess()}catch(e){g=new Chess()}
+  var startFen=g.fen();
+  var re=/\{([^}]*)\}|;[^\n]*|\(|\)|\$\d+|1-0|0-1|1\/2-1\/2|\*|\d+\.(?:\.\.)?|[^\s{}();$]+/g;
+  var depth=0,moves=[],pgnEv=[],pgnAlt=[],pgnClk=[],m,error=null,wantAlt=false;
+  while((m=re.exec(body))){
+    var t=m[0];
+    if(t==='('){depth++;if(depth===1)wantAlt=moves.length>0;continue}
+    if(t===')'){depth=Math.max(0,depth-1);wantAlt=false;continue}
+    if(depth>0){
+      /* first move of a Lichess variation = the engine's better move for the position before the last move */
+      if(wantAlt&&depth===1&&m[1]===undefined&&t.charAt(0)!==';'&&t.charAt(0)!=='$'&&!/^\d+\.+$/.test(t)&&!/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t)){
+        if(pgnAlt[moves.length-1]===undefined)pgnAlt[moves.length-1]=t.replace(/[!?]+$/,'');
+        wantAlt=false;
+      }
+      continue;
+    }
+    if(m[1]!==undefined){
+      if(moves.length){
+        var cm=m[1].match(/\[%clk\s+(\d+):(\d+):(\d+(?:\.\d+)?)\]/);
+        if(cm)pgnClk[moves.length-1]=(+cm[1])*3600+(+cm[2])*60+parseFloat(cm[3]);
+        var lb=m[1].match(/(?:Inaccuracy|Mistake|Blunder)\.\s+(\S+) was best/);
+        if(lb&&pgnAlt[moves.length-1]===undefined)pgnAlt[moves.length-1]=lb[1];
+        var em=m[1].match(/\[%eval\s+(#?[-+]?\d+(?:\.\d+)?)\]/);
+        if(em){var v=em[1];pgnEv[moves.length-1]=v.charAt(0)==='#'?{mate:parseInt(v.slice(1),10)}:{cp:Math.round(parseFloat(v)*100)}}
+      }
+      continue;
+    }
+    var c0=t.charAt(0);
+    if(c0===';'||c0==='$')continue;
+    if(/^\d+\.+$/.test(t)||/^(1-0|0-1|1\/2-1\/2|\*)$/.test(t))continue;
+    var san=t.replace(/[!?]+$/,'');
+    var fenBefore=g.fen();var legal=g.moves().length;
+    var mv=g.move(san,{sloppy:true});
+    if(!mv){error='Could not read the move "'+t+'" (move '+(moves.length+1)+'). The file may be damaged or not standard chess.';break}
+    moves.push({san:mv.san,from:mv.from,to:mv.to,color:mv.color,piece:mv.piece,captured:mv.captured||null,promotion:mv.promotion||null,flags:mv.flags,
+      fenBefore:fenBefore,fenAfter:g.fen(),forced:legal===1,term:g.in_checkmate()?'mate':(g.game_over()?'draw':null)});
+  }
+  pgnClk.forEach(function(c,i){if(moves[i])moves[i].clk=c});
+  var pgnBest=[];
+  pgnAlt.forEach(function(san,i){
+    if(!san||!moves[i])return;
+    try{var gg=new Chess(moves[i].fenBefore),am=gg.move(san,{sloppy:true});if(am)pgnBest[i]=am.from+am.to+(am.promotion||'')}catch(e){}
+  });
+  var out={headers:headers,moves:moves,pgnEv:pgnEv,pgnBest:pgnBest,startFen:startFen,error:error};
+  computeBook(out);
+  return out;
+}
+S.thr={};S.poTok=0;
+
+/* ---------- engine pool: several Stockfish workers side by side ---------- */
+var Pool={ws:[],ready:false,fail:false,initP:null,q:[],
+  init:function(){
+    if(this.initP)return this.initP;
+    var self=this;
+    this.initP=(async function(){
+      var n=Math.max(1,Math.min(4,(navigator.hardwareConcurrency||2)-1)),url=null,i,w;
+      for(i=0;i<SF_URLS.length&&!url;i++){
+        try{w=await self.spawn(SF_URLS[i]);self.ws.push(w);url=SF_URLS[i]}catch(e){}
+      }
+      if(!url){self.fail=true;return false}
+      var rest=[];
+      for(i=1;i<n;i++)rest.push(self.spawn(url).then(function(x){self.ws.push(x)},function(){}));
+      await Promise.all(rest);
+      self.ready=true;return true;
+    })();
+    return this.initP;
+  },
+  spawn:function(url){
+    var self=this;
+    return new Promise(function(res,rej){
+      var done=false,w,o;
+      try{w=new Worker(URL.createObjectURL(new Blob(["importScripts('"+url+"');"],{type:'application/javascript'})))}catch(e){rej(e);return}
+      o={w:w,busy:false,p:null};
+      var to=setTimeout(function(){if(!done){done=true;try{w.terminate()}catch(e){}rej(new Error('timeout'))}},15000);
+      w.onerror=function(e){if(!done){done=true;clearTimeout(to);try{w.terminate()}catch(x){}rej(e)}};
+      w.onmessage=function(ev){
+        var line=typeof ev.data==='string'?ev.data:'';
+        if(line==='uciok')w.postMessage('isready');
+        else if(line==='readyok'&&!done){done=true;clearTimeout(to);w.onmessage=function(e){self.onLine(o,e.data)};res(o)}
+      };
+      w.postMessage('uci');
+    });
+  },
+  onLine:function(o,line){
+    if(typeof line!=='string'||!o.p)return;
+    var p=o.p;
+    if(line.indexOf('info')===0&&line.indexOf(' score ')>-1&&!/lowerbound|upperbound/.test(line)){
+      var m=line.match(/score (cp|mate) (-?\d+)/);
+      if(m)p.score=m[1]==='cp'?{cp:+m[2]}:{mate:+m[2]};
+      var pv=line.match(/ pv (\S+)/);if(pv)p.pv=pv[1];
+    }else if(line.indexOf('bestmove')===0){
+      var b=line.split(' ')[1];
+      o.p=null;o.busy=false;
+      p.resolve({score:p.score,best:(b&&b!=='(none)')?b:(p.pv||null)});
+      this.pump();
+    }
+  },
+  go:function(fen,depth,tok,prio,mt){
+    var self=this;
+    return new Promise(function(resolve){
+      var j={fen:fen,depth:depth,tok:tok,mt:mt||MOVETIME[depth]||1200,resolve:resolve};
+      if(prio)self.q.unshift(j);else self.q.push(j);
+      self.pump();
+    });
+  },
+  pump:function(){
+    while(this.q.length){
+      var o=null,i;
+      for(i=0;i<this.ws.length;i++){if(!this.ws[i].busy){o=this.ws[i];break}}
+      if(!o)return;
+      var j=this.q.shift();
+      if(j.tok!=null&&j.tok!==S.run){j.resolve(null);continue}
+      o.busy=true;o.p={resolve:j.resolve,score:null,pv:null,tok:j.tok};
+      o.w.postMessage('position fen '+j.fen);
+      o.w.postMessage('go depth '+j.depth+' movetime '+j.mt);
+    }
+  },
+  stopAll:function(){
+    var keep=[];
+    this.q.forEach(function(j){if(j.tok!=null&&j.tok!==S.run)j.resolve(null);else keep.push(j)});
+    this.q=keep;
+    this.ws.forEach(function(o){if(o.busy&&o.p&&o.p.tok!=null&&o.p.tok!==S.run)o.w.postMessage('stop')});
+  }
+};
+
+/* ---------- basic fallback analysis (only when Stockfish cannot load) ---------- */
+var BV={p:100,n:320,b:330,r:500,q:900,k:0};
+var BASIC={nodes:0,limit:0};
+function matEval(ch){
+  var b=ch.board(),t=ch.turn(),s=0,r,f,p;
+  for(r=0;r<8;r++)for(f=0;f<8;f++){p=b[r][f];if(p)s+=(p.color===t?1:-1)*BV[p.type]}
+  return s;
+}
+function orderMoves(ms){
+  return ms.sort(function(a,b){return ((b.captured?BV[b.captured]*10-BV[b.piece]:0)+(b.promotion?800:0))-((a.captured?BV[a.captured]*10-BV[a.piece]:0)+(a.promotion?800:0))});
+}
+function doMove(ch,m){return ch.move({from:m.from,to:m.to,promotion:m.promotion})}
+function quiesce(ch,alpha,beta,d){
+  var stand=matEval(ch);
+  if(d===0||stand>=beta)return stand;
+  if(stand>alpha)alpha=stand;
+  var ms=orderMoves(ch.moves({verbose:true}).filter(function(m){return m.captured})),i,sc;
+  for(i=0;i<ms.length;i++){
+    if(++BASIC.nodes>BASIC.limit)throw new Error('budget');
+    doMove(ch,ms[i]);sc=-quiesce(ch,-beta,-alpha,d-1);ch.undo();
+    if(sc>=beta)return sc;if(sc>alpha)alpha=sc;
+  }
+  return alpha;
+}
+function negamax(ch,depth,alpha,beta,ply){
+  var ms=ch.moves({verbose:true});
+  if(!ms.length)return ch.in_check()?-100000+ply:0;
+  if(depth===0)return quiesce(ch,alpha,beta,4);
+  orderMoves(ms);
+  var best=-Infinity,i,sc;
+  for(i=0;i<ms.length;i++){
+    if(++BASIC.nodes>BASIC.limit)throw new Error('budget');
+    doMove(ch,ms[i]);sc=-negamax(ch,depth-1,-beta,-alpha,ply+1);ch.undo();
+    if(sc>best)best=sc;if(sc>alpha)alpha=sc;if(alpha>=beta)break;
+  }
+  return best;
+}
+function basicSearch(fen){
+  var ch=new Chess(fen),ms=orderMoves(ch.moves({verbose:true}));
+  if(!ms.length)return {score:{cp:0},best:null};
+  var result=null,d;
+  for(d=0;d<=2;d++){
+    BASIC.nodes=0;BASIC.limit=d<2?100000:20000;
+    var best=-Infinity,bm=null,alpha=-Infinity;
+    try{
+      for(var i=0;i<ms.length;i++){
+        doMove(ch,ms[i]);var sc=-negamax(ch,d,-Infinity,-alpha,1);ch.undo();
+        if(sc>best){best=sc;bm=ms[i]}if(sc>alpha)alpha=sc;
+      }
+      result={sc:best,bm:bm};
+    }catch(e){try{while(ch.history().length)ch.undo()}catch(x){}break}
+  }
+  if(!result)return {score:{cp:0},best:null};
+  var sc2=result.sc,score;
+  if(Math.abs(sc2)>90000){var plies=100000-Math.abs(sc2);score={mate:sc2>0?Math.ceil(plies/2):-Math.floor(plies/2)}}
+  else score={cp:Math.max(-1000,Math.min(1000,sc2))};
+  return {score:score,best:result.bm.from+result.bm.to+(result.bm.promotion||'')};
+}
+async function basicAnalysis(token){
+  var g=S.game,n=g.moves.length,idxs=[],i;
+  S.basic=true;S.engineFail=false;
+  setNote('The chess engine could not load, so this is a basic review. It only looks at material and short tactics, so treat the labels as rough. Check your internet connection and tap Analyze again for the full review.');
+  for(i=0;i<=n;i++){if(!(i===n&&S.ev[n]))idxs.push(i)}
+  S.total=idxs.length;S.doneCount=0;
+  for(i=0;i<idxs.length;i++){
+    var idx=idxs[i],r=basicSearch(fenAt(idx));
+    if(token!==S.run)return;
+    S.ev[idx]=toWhite(r.score,fenAt(idx));
+    if(idx<n)S.best[idx]=r.best||'';
+    S.doneCount++;showProg('Basic analysis '+S.doneCount+' of '+S.total,S.doneCount/Math.max(1,S.total));
+    scheduleRender();
+    await new Promise(function(res){setTimeout(res,0)});
+    if(token!==S.run)return;
+  }
+  S.analyzing=false;hideProg();renderAll();
+}
+
+/* ---------- analysis state ---------- */
+function fenAt(i){return i===0?S.game.startFen:S.game.moves[i-1].fenAfter}
+function uciOf(mv){return mv.from+mv.to+(mv.promotion||'')}
+function toWhite(score,fen){
+  if(!score)return {cp:0};
+  var b=fen.split(' ')[1]==='b';
+  if(score.mate!=null)return {mate:b?-score.mate:score.mate};
+  return {cp:b?-score.cp:score.cp};
+}
+function flipFen(fen){var p=fen.split(' ');p[1]=p[1]==='w'?'b':'w';p[3]='-';return p.join(' ')}
+function initEval(){
+  var g=S.game,n=g.moves.length;
+  S.ev=new Array(n+1).fill(null);S.best=new Array(n+1).fill(null);
+  g.moves.forEach(function(m,i){
+    if(m.term==='mate')S.ev[i+1]={cp:m.color==='w'?1000:-1000,term:'mate'};
+    else if(m.term==='draw')S.ev[i+1]={cp:0,term:'draw'};
+  });
+  var have=0,need=0;
+  for(var i=0;i<n;i++){if(!S.ev[i+1]){need++;if(g.pgnEv[i]){S.ev[i+1]=g.pgnEv[i];have++}}}
+  S.mode=(need>0&&have/need>=0.9)?'pgn':'engine';
+  if(S.mode==='pgn'){
+    S.ev[0]={cp:18};
+    (g.pgnBest||[]).forEach(function(u,i){if(u)S.best[i]=u});
+  }else{
+    g.moves.forEach(function(m,i){if(!m.term)S.ev[i+1]=null});
+  }
+}
+function lossAt(k){
+  var a=S.ev[k-1],b=S.ev[k];if(!a||!b)return null;
+  var col=S.game.moves[k-1].color;
+  return Math.max(0,winFor(a,col)-winFor(b,col));
+}
+function keyFromLoss(l){
+  if(l<0.5)return 'best';if(l<2)return 'excellent';if(l<5)return 'good';if(l<10)return 'inaccuracy';if(l<20)return 'mistake';return 'blunder';
+}
+function labelAt(k){
+  if(isBook(k))return 'book';
+  var l=lossAt(k);if(l==null)return null;
+  var mv=S.game.moves[k-1],bm=S.best[k-1];
+  if(mv.forced)return 'best';
+  if(bm&&bm===uciOf(mv)&&l<5)return 'best';
+  if(l<0.4&&S.mode==='pgn'&&!bm)return 'best';
+  if(l<2)return 'excellent';if(l<5)return 'good';if(l<10)return 'inaccuracy';if(l<20)return 'mistake';return 'blunder';
+}
+function isSlip(key){return key==='inaccuracy'||key==='mistake'||key==='blunder'}
+function stats(){
+  var out={w:{n:0,sum:0,c:{}},b:{n:0,sum:0,c:{}}};
+  for(var k=1;k<=S.game.moves.length;k++){
+    var key=labelAt(k);if(!key)continue;
+    var o=out[S.game.moves[k-1].color];
+    o.c[key]=(o.c[key]||0)+1;
+    if(key==='book')continue;
+    var l=lossAt(k);if(l==null)continue;
+    o.n++;o.sum+=moveAcc(l);
+  }
+  return out;
+}
+
+var rq=false;
+function scheduleRender(){if(rq)return;rq=true;requestAnimationFrame(function(){rq=false;renderAll()})}
+
+async function runAnalysis(){
+  var token=++S.run;var g=S.game;if(!g||g.error||!g.moves.length)return;
+  Pool.stopAll();
+  initEval();S.engineFail=false;S.basic=false;S.doneCount=0;S.total=0;S.analyzing=true;renderAll();
+  var depth=+$('depth').value,n=g.moves.length,queue=[],i;
+  if(S.mode==='engine'){for(i=0;i<=n;i++){if(i===n&&S.ev[n])continue;queue.push(i)}}
+  else{for(i=0;i<=n;i++){if(!S.ev[i])queue.push(i)}}
+  var findBest=function(){var out=[];for(var k=1;k<=n;k++){var l=lossAt(k);if(l!=null&&l>=5&&S.best[k-1]==null)out.push(k-1)}return out};
+  if(S.mode==='pgn'&&!queue.length&&!findBest().length){
+    S.analyzing=false;hideProg();
+    setNote('This file already has Lichess analysis, so the review is instant. Evaluations and better moves come straight from the file.');
+    renderAll();return;
+  }
+  if(S.mode==='pgn')setNote('This file already has Lichess analysis, so the review is instant. The engines only fill in a few missing better moves.');
+  else setNote('');
+  showProg('Loading the chess engines…',0);
+  if(Pool.fail){Pool.fail=false;Pool.initP=null}
+  if(!Pool.ready){await Pool.init()}
+  if(token!==S.run)return;
+  if(!Pool.ready){
+    if(S.mode==='engine'){
+      try{await basicAnalysis(token)}
+      catch(e){S.analyzing=false;S.engineFail=true;hideProg();setNote('The chess engine could not load, and the basic review failed too. You can still step through the moves. Tap Analyze again to retry.','err');renderAll()}
+      return;
+    }
+    S.analyzing=false;S.engineFail=true;hideProg();
+    setNote('Your file’s Lichess analysis is loaded. The engine could not start, so a few better-move arrows are missing.');
+    renderAll();return;
+  }
+  var engLabel=Pool.ws.length+' engine'+(Pool.ws.length>1?'s':'');
+  var runJobs=function(list,storeEv,label){
+    S.total=list.length;S.doneCount=0;
+    return Promise.all(list.map(function(idx){
+      return Pool.go(fenAt(idx),depth,token).then(function(r){
+        if(!r||token!==S.run)return;
+        if(storeEv)S.ev[idx]=toWhite(r.score,fenAt(idx));
+        if(idx<n)S.best[idx]=r.best||'';
+        S.doneCount++;
+        showProg(label+' '+S.doneCount+' of '+S.total+' · '+engLabel,S.doneCount/Math.max(1,S.total));
+        scheduleRender();
+      });
+    }));
+  };
+  await runJobs(queue,true,'Analyzing position');
+  if(token!==S.run)return;
+  if(S.mode==='pgn'){
+    await runJobs(findBest(),false,'Finding better moves');
+    if(token!==S.run)return;
+  }
+  S.analyzing=false;hideProg();
+  setNote(S.mode==='pgn'?'Evaluations and better moves come from the Lichess analysis in your file. Missing better moves were filled in with Stockfish.':'Analyzed in your browser with Stockfish ('+engLabel+' side by side) at '+({10:'quick',12:'standard',15:'deep'}[depth]||'standard')+' depth.');
+  renderAll();
+}
+
+/* ---------- explanations ---------- */
+function hangInfo(mv){
+  var g=new Chess(mv.fenAfter),worst=null;
+  g.moves({verbose:true}).forEach(function(c){
+    if(!c.captured||c.captured==='k')return;
+    var g2=new Chess(mv.fenAfter);g2.move({from:c.from,to:c.to,promotion:c.promotion});
+    var recap=g2.moves({verbose:true}).some(function(m){return m.to===c.to&&m.captured});
+    var gain=VAL[c.captured]-(recap?VAL[c.piece]:0);
+    if(gain>=2&&(!worst||gain>worst.gain))worst={gain:gain,sq:c.to,piece:c.captured,capturer:c.piece,free:!recap};
+  });
+  return worst;
+}
+function betterMove(k){
+  var bUci=S.best[k-1],mv=S.game.moves[k-1];
+  if(!bUci||bUci===uciOf(mv))return null;
+  try{var g=new Chess(mv.fenBefore);return g.move({from:bUci.slice(0,2),to:bUci.slice(2,4),promotion:bUci.charAt(4)||undefined})}catch(e){return null}
+}
+var TIPS=['Before you move, check what your opponent’s last move is threatening.','After you pick a move, ask: does it leave any of my pieces undefended?','Look at every check, capture and threat for both sides before you commit.'];
+function describe(mv){
+  var d;
+  if(mv.flags.indexOf('k')>-1||mv.flags.indexOf('q')>-1)d='castled, tucking the king away and bringing a rook into play';
+  else if(mv.captured)d='captured a '+PN[mv.captured]+' on '+mv.to+' with the '+PN[mv.piece];
+  else d='moved the '+PN[mv.piece]+' to '+mv.to;
+  if(mv.promotion)d+=', promoting to a '+PN[mv.promotion];
+  if(mv.san.indexOf('#')>-1)d+='. Checkmate!';else if(mv.san.indexOf('+')>-1)d+=', giving check';
+  return d;
+}
+function explain(k){
+  var mv=S.game.moves[k-1],key=labelAt(k),l=lossAt(k),mine=mv.color===S.me;
+  if(!key)return null;
+  var subj=mine?'You':'Your opponent';
+  if(key==='book'){
+    var nm=S.game.bookNames[k]||S.game.openName;
+    var bp=[subj+' '+describe(mv)+'.'];
+    bp.push('This is a standard opening move'+(nm?' in the '+nm:'')+'. Strong players have played it for years, so it is not counted in accuracy.');
+    return {head:'Book move. Straight from opening theory.',key:key,parts:bp,better:null,tip:(mine&&k<=2)?'Knowing a few openings well saves thinking time and keeps you out of early trouble.':null};
+  }
+  var heads={
+    best:mine?'You found the best move.':'Your opponent found the best move.',
+    excellent:mine?'Excellent. Nearly the best move.':'Excellent move by your opponent.',
+    good:mine?'A good, solid move.':'A solid move by your opponent.',
+    inaccuracy:mine?'A small slip. There was something better.':'Your opponent slipped a little.',
+    mistake:mine?'That’s a mistake.':'Your opponent made a mistake.',
+    blunder:mine?'That’s a blunder. This one really hurts.':'Your opponent blundered. A big chance for you!'
+  };
+  var parts=[],d=describe(mv);
+  parts.push(subj+' '+d+(d.charAt(d.length-1)==='!'?'':'.'));
+  var a=S.ev[k-1],b=S.ev[k],h=null,missedMate=false;
+  if(l>=5&&a&&b){
+    var wb=winFor(a,S.me),wa=winFor(b,S.me),w1=posWord(wb),w2=posWord(wa);
+    parts.push(w1===w2?'For you, the game stayed '+w1+', but the margin shrank.':'For you, the game went from '+w1+' to '+w2+'.');
+    if(b.mate!=null){
+      var against=mv.color==='w'?b.mate<0:b.mate>0;
+      if(against)parts.push(mine?'This lets your opponent checkmate you in '+Math.abs(b.mate)+'.':'This lets you checkmate in '+Math.abs(b.mate)+'!');
+    }
+    if(a.mate!=null){
+      var had=mv.color==='w'?a.mate>0:a.mate<0;
+      if(had&&!(b.mate!=null&&(mv.color==='w'?b.mate>0:b.mate<0))){missedMate=true;parts.push(mine?'You had a forced checkmate here.':'They had a forced checkmate here and missed it.')}
+    }
+  }
+  if(l>=10){
+    h=hangInfo(mv);
+    if(h)parts.push((mine?'Your ':'Their ')+PN[h.piece]+' on '+h.sq+' can be captured by a '+PN[h.capturer]+(h.free?' and nothing protects it.':', and that trade loses material.'));
+  }
+  if(mine&&l>=10&&mv.clk!=null){
+    var base=parseInt((S.game.headers.TimeControl||'').split('+')[0],10)||0;
+    if(mv.clk<=Math.max(10,base*0.05))parts.push('You only had '+Math.floor(mv.clk/60)+':'+('0'+Math.floor(mv.clk%60)).slice(-2)+' left on your clock. Rushing is a common reason for mistakes.');
+  }
+  var out={head:heads[key],key:key,parts:parts,better:null,tip:null};
+  var bm=l>=5?betterMove(k):null;
+  if(bm){
+    var why='.';
+    if(bm.san.indexOf('#')>-1)why=', which is checkmate!';
+    else if(bm.captured)why=', which wins a '+PN[bm.captured]+'.';
+    else if(bm.san.indexOf('+')>-1)why=', which gives check and keeps the pressure on.';
+    out.better=(mine?'A stronger move was ':'Their best move was ')+bm.san+why;
+  }
+  if(mine&&l>=10){
+    if(missedMate)out.tip='Always look at every check first. Forcing moves are how most checkmates start.';
+    else if(mv.piece==='q'&&k<=14)out.tip='Bringing the queen out early lets your opponent attack it and gain time. Develop knights and bishops first.';
+    else if(h)out.tip='Before you press a move, ask: after it, can any of my pieces be taken for free?';
+    else out.tip=TIPS[k%3];
+  }else if(mine&&l>=5&&k>=3&&k<=24&&(mv.piece==='n'||mv.piece==='b')&&S.game.moves[k-3].piece===mv.piece&&S.game.moves[k-3].to===mv.from){
+    out.tip='In the opening, try to move each piece only once and bring out a new one each turn.';
+  }else if(mine&&k<=6&&mv.piece==='p'&&['e4','d4','e5','d5'].indexOf(mv.to)>-1&&l<5){
+    out.tip='Pawns in the center give your pieces more room to move.';
+  }
+  return out;
+}
+
+function phaseOf(k){
+  if(k<=20)return 'opening';
+  var left=S.game.moves[k-1].fenBefore.split(' ')[0].replace(/[pPkK\d\/]/g,'');
+  return left.length<=6?'endgame':'middlegame';
+}
+function weakPhase(){
+  var acc={},k,l,p;
+  for(k=1;k<=S.game.moves.length;k++){
+    if(S.game.moves[k-1].color!==S.me||isBook(k))continue;
+    l=lossAt(k);if(l==null)continue;
+    p=phaseOf(k);acc[p]=acc[p]||{n:0,s:0};acc[p].n++;acc[p].s+=moveAcc(l);
+  }
+  var names=Object.keys(acc).filter(function(x){return acc[x].n>=5});
+  if(names.length<2)return '';
+  var lo=null,hi=null;
+  names.forEach(function(x){var a=acc[x].s/acc[x].n;if(!lo||a<lo.a)lo={p:x,a:a};if(!hi||a>hi.a)hi={p:x,a:a}});
+  if(hi.a-lo.a<8)return '';
+  return 'Your weakest part was the '+lo.p+' (accuracy '+lo.a.toFixed(0)+').';
+}
+
+/* ---------- threats: what could the side not on move do next? ---------- */
+function threatInfo(k){
+  if(!S.showThreat||S.po||!S.game)return null;
+  var fen=fenAt(k),ch=new Chess(fen);
+  if(ch.game_over()||ch.in_check())return null;
+  var ff=flipFen(fen),c=S.thr[ff];
+  if(!c||c==='p'||!c.best||!S.ev[k])return null;
+  var stm=ch.turn(),tc=stm==='w'?'b':'w';
+  if(winFor(c.score,tc)-winFor(S.ev[k],tc)<12)return null;
+  var m;
+  try{m=new Chess(ff).move({from:c.best.slice(0,2),to:c.best.slice(2,4),promotion:c.best.charAt(4)||undefined})}catch(e){return null}
+  if(!m)return null;
+  var what=m.san.indexOf('#')>-1?'checkmate you':m.captured?'capture the '+PN[m.captured]+' on '+m.to+' with the '+PN[m.piece]:'play '+m.san+', which creates a strong attack';
+  if(m.san.indexOf('#')>-1&&stm!==S.me)what='checkmate your opponent';
+  var text=stm===S.me?'Your opponent is threatening to '+what+'.':'You are threatening to '+what+'.';
+  return {text:text,uci:c.best};
+}
+function ensureThreat(){
+  var g=S.game;if(!g||g.error||!S.showThreat||S.po)return;
+  var k=S.ply,fen=fenAt(k),ch=new Chess(fen);
+  if(ch.game_over()||ch.in_check())return;
+  var ff=flipFen(fen);if(S.thr[ff])return;
+  S.thr[ff]='p';
+  Pool.init().then(function(ok){
+    if(S.game!==g)return;
+    if(!ok){delete S.thr[ff];return}
+    return Pool.go(ff,10,null,true,PO_MOVETIME).then(function(r){
+      if(S.game!==g)return;
+      S.thr[ff]=r&&r.best?{best:r.best,score:toWhite(r.score,ff)}:{best:null,score:{cp:0}};
+      if(S.ply===k&&!S.po)renderNav();
+    });
+  });
+}
+
+/* ---------- rendering ---------- */
+function showProg(t,f){$('progWrap').hidden=false;$('progTxt').textContent=t;$('progBar').style.width=Math.round(f*100)+'%'}
+function hideProg(){$('progWrap').hidden=true}
+function setNote(t,err){var n=$('note');if(!t){n.hidden=true;return}n.hidden=false;n.className='note'+(err?' err':'');n.textContent=t}
+
+function renderSummary(){
+  var g=S.game,el=$('summary');
+  if(!g){el.innerHTML='';return}
+  var h=g.headers,st=stats();
+  var wn=h.White||'White',bn=h.Black||'Black';
+  var acc=function(c){return st[c].n?(st[c].sum/st[c].n):null};
+  var pl=function(c,name,elo){
+    var a=acc(c);
+    return '<div class="pl'+(S.me===c?' me':'')+'"><div class="who"><span class="sw '+c+'"></span><span class="nm">'+esc(name)+'</span></div><div class="elo">'+(elo?esc(elo):'&nbsp;')+(S.me===c?' &middot; you':'')+'</div><div class="acc">'+(a==null?'—':a.toFixed(1))+' <small>accuracy</small></div></div>';
+  };
+  var res=h.Result,me=S.me;
+  var won=(res==='1-0'&&me==='w')||(res==='0-1'&&me==='b'),lost=(res==='1-0'&&me==='b')||(res==='0-1'&&me==='w'),drew=res==='1/2-1/2';
+  var rtxt=won?'You won.':lost?'You lost.':drew?'The game was drawn.':'';
+  var mine=acc(me),head,extra='';
+  if(mine==null){head=S.engineFail?'Analysis is not available yet.':'Analyzing your game…'}
+  else{
+    head=mine>=90?'A very clean game.':mine>=80?'A strong game with only small slips.':mine>=65?'A decent game with a few moments to learn from.':mine>=50?'A bumpy game, and every game like this teaches something.':'A tough game. The list below shows what to work on first.';
+    var worst=null;
+    for(var k=1;k<=g.moves.length;k++){if(g.moves[k-1].color!==me)continue;var l=lossAt(k);if(l!=null&&l>=10&&(!worst||l>worst.l))worst={k:k,l:l}}
+    if(worst){var m=g.moves[worst.k-1];extra='Your biggest slip was on move '+Math.ceil(worst.k/2)+' ('+esc(m.san)+'). Tap it in the list below to see why.'}
+    else extra='You made no big mistakes. Nice work.';
+    var wp=weakPhase();if(wp)extra+=' '+wp;
+  }
+  var opn=g.openName||'';
+  var cnt='<div class="counts"><span class="h" style="text-align:left"></span><span class="h">You</span><span class="h">Opponent</span>';
+  var opp=me==='w'?'b':'w';
+  LABELS.forEach(function(L){
+    cnt+='<span class="lb L-'+L.key+'"><span class="sy">'+L.sym+'</span>'+L.name+'</span><span class="n">'+(st[me].c[L.key]||0)+'</span><span class="n">'+(st[opp].c[L.key]||0)+'</span>';
+  });
+  cnt+='</div>';
+  el.innerHTML='<div class="sumgrid"><div><h2>The game</h2><div class="seg" role="group" aria-label="Which side did you play?" style="margin-top:10px">'
+    +'<button type="button" data-me="w" aria-pressed="'+(me==='w')+'">I played White<br><span style="opacity:.8">'+esc(wn)+'</span></button>'
+    +'<button type="button" data-me="b" aria-pressed="'+(me==='b')+'">I played Black<br><span style="opacity:.8">'+esc(bn)+'</span></button></div>'
+    +'<div class="players">'+pl('w',wn,h.WhiteElo&&h.WhiteElo!=='?'?h.WhiteElo+' rating':'')+pl('b',bn,h.BlackElo&&h.BlackElo!=='?'?h.BlackElo+' rating':'')+'</div>'
+    +'<div class="verdict"><h2>'+head+'</h2>'+(rtxt?'<p>'+rtxt+(h.Termination&&h.Termination!=='Normal'?' ('+esc(h.Termination)+')':'')+'</p>':'')+(opn?'<p class="muted">Opening: '+esc(opn)+(g.bookN?' ('+Math.ceil(g.bookN/2)+' moves of theory)':'')+'</p>':'')+(extra?'<p class="muted">'+extra+'</p>':'')+'</div></div>'
+    +'<div><h3 style="margin-bottom:10px">Move quality</h3>'+cnt+'</div></div>';
+}
+
+function posOf(sq,ow){var f=sq.charCodeAt(0)-97,r=+sq.charAt(1)-1;return {x:(ow?f:7-f)*10,y:(ow?7-r:r)*10}}
+function arrowSvg(uci,thr,ow){
+  var p1=posOf(uci.slice(0,2),ow),p2=posOf(uci.slice(2,4),ow);
+  var x1=p1.x+5,y1=p1.y+5,x2=p2.x+5,y2=p2.y+5,dx=x2-x1,dy=y2-y1,len=Math.sqrt(dx*dx+dy*dy)||1,ux=dx/len,uy=dy/len;
+  var tx=x2-ux*1.2,ty=y2-uy*1.2,bx=tx-ux*3.6,by=ty-uy*3.6,nx=-uy*2.5,ny=ux*2.5,c=thr?' thr':'';
+  return '<line class="arrow'+c+'" x1="'+(x1+ux*2)+'" y1="'+(y1+uy*2)+'" x2="'+bx+'" y2="'+by+'"/><polygon class="arrowhead'+c+'" points="'+tx+','+ty+' '+(bx+nx)+','+(by+ny)+' '+(bx-nx)+','+(by-ny)+'"/>';
+}
+function boardFlipped(){return (S.me==='w')!==S.flip}
+function renderBoard(){
+  var g=S.game;if(!g)return;
+  var ow=boardFlipped(),po=S.po;
+  var ch=po?po.ch:new Chess(fenAt(S.ply)),b=ch.board(),s='',f,r,i;
+  for(f=0;f<8;f++)for(r=0;r<8;r++){
+    var x=(ow?f:7-f)*10,y=(ow?7-r:r)*10;
+    s+='<rect x="'+x+'" y="'+y+'" width="10" height="10" class="'+((f+r)%2===0?'sqD':'sqL')+'"/>';
+  }
+  var mv=(!po&&S.ply>0)?g.moves[S.ply-1]:null,key=mv?labelAt(S.ply):null;
+  if(mv){
+    var cls='L-'+(key||'none');
+    [mv.from,mv.to].forEach(function(sq){var p=posOf(sq,ow);s+='<rect class="hl '+cls+'" x="'+p.x+'" y="'+p.y+'" width="10" height="10"/>'});
+  }
+  if(po&&po.last){
+    [po.last.from,po.last.to].forEach(function(sq){var p=posOf(sq,ow);s+='<rect class="hl L-none" x="'+p.x+'" y="'+p.y+'" width="10" height="10"/>'});
+  }
+  if(po&&po.sel){var ps=posOf(po.sel,ow);s+='<rect class="selsq" x="'+ps.x+'" y="'+ps.y+'" width="10" height="10"/>'}
+  for(i=0;i<8;i++){
+    var fileIdx=ow?i:7-i,bottomRank=ow?0:7;
+    s+='<text class="'+((fileIdx+bottomRank)%2===0?'cd':'cl')+'" x="'+(i*10+9.2)+'" y="79" text-anchor="end">'+String.fromCharCode(97+fileIdx)+'</text>';
+    var rankIdx=ow?7-i:i,leftFile=ow?0:7;
+    s+='<text class="'+((leftFile+rankIdx)%2===0?'cd':'cl')+'" x=".8" y="'+(i*10+3)+'">'+(rankIdx+1)+'</text>';
+  }
+  for(r=0;r<8;r++)for(f=0;f<8;f++){
+    var pc=b[r][f];if(!pc)continue;
+    var p=posOf(String.fromCharCode(97+f)+(8-r),ow);
+    s+='<text class="pc '+(pc.color==='w'?'pw':'pb')+'" x="'+(p.x+5)+'" y="'+(p.y+7.6)+'">'+GL[pc.type]+'</text>';
+  }
+  if(po&&po.sel){
+    ch.moves({square:po.sel,verbose:true}).forEach(function(m){
+      var pt=posOf(m.to,ow);
+      s+=m.captured?'<circle class="ring" cx="'+(pt.x+5)+'" cy="'+(pt.y+5)+'" r="4.3"/>':'<circle class="dot" cx="'+(pt.x+5)+'" cy="'+(pt.y+5)+'" r="1.6"/>';
+    });
+  }
+  if(mv){
+    if(S.showThreat){var ti=threatInfo(S.ply);if(ti)s+=arrowSvg(ti.uci,true,ow)}
+    if(S.showArrow){
+      var bu=S.best[S.ply-1];
+      if(bu&&bu!==uciOf(mv)&&isSlip(key))s+=arrowSvg(bu,false,ow);
+    }
+    if(key){
+      var pt2=posOf(mv.to,ow),sym=LBL[key].sym;
+      s+='<g class="L-'+key+'"><circle class="bdg" cx="'+(pt2.x+7)+'" cy="'+(pt2.y+3)+'" r="2.8"/><text class="bdt" x="'+(pt2.x+7)+'" y="'+(pt2.y+4.1)+'" style="font-size:'+(sym.length>1?2.5:3.1)+'px">'+sym+'</text></g>';
+    }
+  }else if(!po&&S.ply===0&&S.showThreat){
+    var t0=threatInfo(0);if(t0)s+=arrowSvg(t0.uci,true,ow);
+  }
+  var bd=$('board');bd.innerHTML=s;
+  bd.classList.toggle('playing',!!po);
+  bd.setAttribute('aria-label',po?'Practice position':(S.ply===0?'Starting position':'Position after '+Math.ceil(S.ply/2)+(g.moves[S.ply-1].color==='w'?'. ':'... ')+g.moves[S.ply-1].san));
+  var e=po?po.ev:S.ev[S.ply],fill=$('evalfill');
+  fill.style.height=(e?winW(e):50)+'%';
+  fill.className='w '+(ow?'bot':'top');
+  $('evalbar').title=e?'Evaluation '+fmtEval(e):'';
+}
+
+function moveLabel(k){var m=S.game.moves[k-1];return Math.ceil(k/2)+(m.color==='w'?'. ':'... ')+m.san}
+function renderCoach(){
+  var g=S.game,el=$('coach');
+  if(!g){el.innerHTML='';return}
+  var k=S.ply,n=g.moves.length,po=S.po;
+  if(po){
+    $('cap').textContent='Practice mode · position before move '+moveLabel(po.k);
+    var fb='';
+    if(po.fb){
+      if(po.fb.wait)fb='<p class="muted">Checking '+esc(po.fb.san)+'…</p>';
+      else fb='<div class="top"><span class="mvname">'+esc(po.fb.san)+'</span><span class="chip L-'+po.fb.key+'"><span class="sy">'+LBL[po.fb.key].sym+'</span>'+LBL[po.fb.key].name+'</span></div><p>'+esc(po.fb.text)+'</p>';
+    }
+    el.innerHTML='<h2>Your turn. Find a better move.</h2><p>You are back before '+esc(moveLabel(po.k))+'. Tap a piece, then tap where it should go. The engine plays your opponent’s replies.</p>'+fb+
+      '<div class="acts"><button class="btn" type="button" data-act="again">Start over</button><button class="btn primary" type="button" data-act="exit">Back to the game</button></div>';
+    return;
+  }
+  $('cap').textContent=k===0?'Start · '+n+' moves':'Move '+k+' of '+n+(S.ev[k]?' · evaluation '+fmtEval(S.ev[k]):'');
+  if(g.error){el.innerHTML='<h2>Problem with this file</h2><p>'+esc(g.error)+'</p>';return}
+  var ti=threatInfo(k),thr=ti?'<div class="threat"><b>WATCH OUT</b><span>'+esc(ti.text)+'</span></div>':'';
+  if(k===0){
+    el.innerHTML='<h2>Ready when you are</h2><p>Press Play to watch the game, or step through it with the arrows under the board or the left and right keys. Each move gets a label and a plain explanation here.</p>'+thr+
+      '<p class="muted">Green means strong, orange and red mean someone gave something away. A green arrow shows what could have been played. A red dashed arrow shows a threat.</p>';
+    return;
+  }
+  var x=explain(k),ev=S.ev[k];
+  var html='<div class="top"><span class="mvname">'+esc(moveLabel(k))+'</span>';
+  if(x)html+='<span class="chip L-'+x.key+'"><span class="sy">'+LBL[x.key].sym+'</span>'+LBL[x.key].name+'</span>';
+  html+='</div>';
+  if(!x){
+    html+='<h2>'+(S.analyzing?'Reviewing this move…':(S.engineFail?'No analysis yet':'Waiting for analysis'))+'</h2><p class="muted">'+(S.analyzing?'The engines are working through the game. You can keep stepping through the moves in the meantime.':'Analysis could not run for this move.')+'</p>';
+  }else{
+    html+='<h2>'+x.head+'</h2><div class="parts">'+x.parts.map(function(p){return '<p>'+esc(p)+'</p>'}).join('')+'</div>';
+    if(x.better)html+='<div class="better">'+esc(x.better)+'</div>';
+    html+=thr;
+    if(x.tip)html+='<p class="tip">Tip: '+esc(x.tip)+'</p>';
+    if(g.moves[k-1].color===S.me&&isSlip(x.key))html+='<div class="acts"><button class="btn primary" type="button" data-act="try">Try a better move</button></div>';
+  }
+  if(ev)html+='<p class="evline">'+esc(evalSentence(ev))+' ('+fmtEval(ev)+')</p>';
+  el.innerHTML=html;
+}
+
+function renderGraph(){
+  var g=S.game,svg=$('graph');if(!g){svg.innerHTML='';return}
+  var n=g.moves.length,W=400,H=110,s='';
+  var X=function(i){return n===0?0:i/n*W},Y=function(e){return H*(1-winW(e)/100)};
+  s+='<rect x="0" y="0" width="'+W+'" height="'+H+'" fill="var(--graph-dark)"/>';
+  var pts=[];
+  for(var i=0;i<=n;i++){if(S.ev[i])pts.push([X(i),Y(S.ev[i]),i]);else break}
+  if(pts.length>1){
+    var d='M'+pts[0][0]+','+H+' L'+pts.map(function(p){return p[0].toFixed(1)+','+p[1].toFixed(1)}).join(' L')+' L'+pts[pts.length-1][0]+','+H+' Z';
+    s+='<path d="'+d+'" fill="var(--graph-light)"/>';
+  }
+  s+='<line x1="0" y1="'+H/2+'" x2="'+W+'" y2="'+H/2+'" stroke="var(--accent)" stroke-width="0.8" stroke-dasharray="3 3" opacity=".8"/>';
+  if(g.bookN>0)s+='<rect x="0" y="'+(H-5)+'" width="'+X(g.bookN).toFixed(1)+'" height="5" fill="var(--book)"/>';
+  for(var k=1;k<=n;k++){
+    if(g.moves[k-1].color!==S.me)continue;
+    var key=labelAt(k);
+    if(isSlip(key)&&S.ev[k]){
+      s+='<circle class="L-'+key+'" cx="'+X(k).toFixed(1)+'" cy="'+Y(S.ev[k]).toFixed(1)+'" r="'+(key==='inaccuracy'?2.4:3.2)+'" style="fill:var(--c);stroke:#fff;stroke-width:.8"/>';
+    }
+  }
+  var cx=X(S.po?S.po.k-1:S.ply);
+  s+='<line x1="'+cx+'" y1="0" x2="'+cx+'" y2="'+H+'" stroke="var(--accent)" stroke-width="1.6"/>';
+  svg.innerHTML=s;
+}
+
+function renderKey(){
+  var g=S.game,el=$('keyCard');if(!g){el.innerHTML='';return}
+  var list=[];
+  for(var k=1;k<=g.moves.length;k++){
+    if(g.moves[k-1].color!==S.me||isBook(k))continue;
+    var l=lossAt(k),key=labelAt(k);
+    if(l!=null&&l>=10)list.push({k:k,l:l,key:key});
+  }
+  list.sort(function(a,b){return b.l-a.l});list=list.slice(0,4);
+  var h='<h3>Learn from your mistakes</h3>';
+  if(!list.length){
+    h+='<p class="muted" style="margin-top:8px">'+(stats()[S.me].n?'No mistakes or blunders from you in this game.':'Your biggest slips will show up here once the analysis finishes.')+'</p>';
+  }else{
+    h+='<div class="key">'+list.map(function(it){
+      return '<button type="button" data-ply="'+it.k+'"><span class="kn">'+esc(moveLabel(it.k))+'</span><span class="chip L-'+it.key+'"><span class="sy">'+LBL[it.key].sym+'</span>'+LBL[it.key].name+'</span><span class="kd">Your winning chances dropped by '+Math.round(it.l)+' points.</span></button>';
+    }).join('')+'</div>';
+  }
+  el.innerHTML=h;
+}
+
+function renderMoves(){
+  var g=S.game,el=$('moves');if(!g){el.innerHTML='';return}
+  var rows=[],startFull=parseInt((g.startFen.split(' ')[5]||'1'),10)||1,num=startFull,cur=null;
+  g.moves.forEach(function(m,i){
+    if(m.color==='w'){cur={n:num,w:i+1,b:0};rows.push(cur);num++}
+    else{
+      if(!cur||cur.b||cur.w===0&&rows.length){cur={n:num,w:0,b:i+1};if(rows.length===0)num++;rows.push(cur)}
+      else cur.b=i+1;
+    }
+  });
+  var cell=function(k){
+    if(!k)return '<span></span>';
+    var key=labelAt(k),q='';
+    if(isSlip(key))q='<span class="q L-'+key+'">'+LBL[key].sym+'</span>';
+    return '<button type="button" class="mvb'+(S.ply===k&&!S.po?' on':'')+(key==='book'?' bk':'')+'" data-ply="'+k+'">'+esc(g.moves[k-1].san)+q+'</button>';
+  };
+  el.innerHTML=rows.map(function(r){return '<div class="mrow"><span class="mn">'+r.n+'.</span>'+cell(r.w)+cell(r.b)+'</div>'}).join('');
+}
+
+function updateShare(){
+  var a=$('shLichess'),g=S.game;
+  if(!g||g.error||!g.moves.length){a.hidden=true;return}
+  var m=(g.headers.Site||'').match(/lichess\.org\/([A-Za-z0-9]{8})/);
+  if(m){a.href='https://lichess.org/'+m[1]+(S.me==='b'?'/black':'')+'#'+(S.po?S.po.k-1:S.ply);a.textContent='Open game on Lichess'}
+  else{a.href='https://lichess.org/analysis/'+(S.po?S.po.ch.fen():fenAt(S.ply)).replace(/ /g,'_');a.textContent='Open position on Lichess'}
+  a.hidden=false;
+}
+function renderAll(){renderSummary();renderBoard();renderCoach();renderGraph();renderKey();renderMoves();updateShare();$('rerun').disabled=!S.game||S.analyzing||!!S.game.error;ensureThreat()}
+function renderNav(){renderBoard();renderCoach();renderGraph();updateShare();
+  var bs=document.querySelectorAll('.mvb');for(var i=0;i<bs.length;i++){bs[i].classList.toggle('on',+bs[i].dataset.ply===S.ply&&!S.po)}
+  ensureThreat()}
+function goStep(p){if(!S.game)return;p=Math.max(0,Math.min(S.game.moves.length,p));S.ply=p;renderNav()}
+function goTo(p){
+  stopAuto();
+  var was=S.po;S.po=null;
+  if(!S.game)return;
+  p=Math.max(0,Math.min(S.game.moves.length,p));
+  if(p===S.ply&&!was)return;
+  S.ply=p;renderNav();
+}
+
+/* ---------- play the game automatically ---------- */
+function stopAuto(){
+  if(S.auto.t){clearInterval(S.auto.t);S.auto.t=null}
+  S.auto.on=false;
+  var b=$('bPlay');b.innerHTML='&#9654; Play';b.setAttribute('aria-label','Play the game automatically');
+}
+function autoTick(){
+  var n=S.game?S.game.moves.length:0;
+  if(S.ply>=n){stopAuto();return}
+  goStep(S.ply+1);
+  var k=S.ply,key=labelAt(k);
+  if(S.ply>=n){stopAuto();return}
+  if($('pauseChk').checked&&S.game.moves[k-1].color===S.me&&(key==='mistake'||key==='blunder'))stopAuto();
+}
+function startAuto(){
+  if(!S.game||S.game.error||!S.game.moves.length)return;
+  if(S.po){S.po=null}
+  if(S.ply>=S.game.moves.length)goStep(0);else renderNav();
+  S.auto.on=true;
+  var b=$('bPlay');b.innerHTML='&#10074;&#10074; Pause';b.setAttribute('aria-label','Pause');
+  S.auto.t=setInterval(autoTick,+$('speed').value);
+}
+
+/* ---------- practice: try a better move ---------- */
+function poStart(k){
+  stopAuto();
+  var mv=S.game.moves[k-1],tok=++S.poTok;
+  Pool.init().then(function(ok){
+    if(S.poTok!==tok)return;
+    if(!ok){setNote('Practice needs the chess engine, which could not load. Check your connection and try again.','err');return}
+    S.po={k:k,ch:new Chess(mv.fenBefore),color:mv.color,sel:null,last:null,fb:null,busy:false,ev:S.ev[k-1],tok:tok};
+    renderBoard();renderCoach();renderGraph();updateShare();
+  });
+}
+function poExit(){S.poTok++;S.po=null;renderNav()}
+function poClick(sq){
+  var po=S.po;if(!po||po.busy)return;
+  var ch=po.ch;if(ch.turn()!==po.color||ch.game_over())return;
+  var pc=ch.get(sq);
+  if(po.sel){
+    var legal=ch.moves({square:po.sel,verbose:true}).filter(function(m){return m.to===sq});
+    if(legal.length){poPlay(po.sel,sq);return}
+  }
+  po.sel=(pc&&pc.color===po.color&&sq!==po.sel)?sq:null;
+  renderBoard();
+}
+function poPlay(from,to){
+  var po=S.po,ch=po.ch,evBefore=po.ev,color=po.color;
+  var m=ch.move({from:from,to:to,promotion:'q'});if(!m)return;
+  po.sel=null;po.last={from:from,to:to};po.busy=true;po.fb={wait:true,san:m.san};
+  var fen=ch.fen();
+  renderBoard();renderCoach();
+  var over=ch.game_over();
+  if(over){
+    var mate=ch.in_checkmate();
+    po.ev=mate?{cp:color==='w'?1000:-1000,term:'mate'}:{cp:0,term:'draw'};
+    po.fb={san:m.san,key:mate?'best':'good',text:mate?'Checkmate! That is exactly how to finish it.':'The game ends in a draw here.'};
+    po.busy=false;renderBoard();renderCoach();return;
+  }
+  Pool.go(fen,12,null,true,PO_MOVETIME).then(function(r){
+    if(S.po!==po)return;
+    var evAfter=toWhite(r?r.score:null,fen);
+    var text,key;
+    if(evBefore){
+      var loss=Math.max(0,winFor(evBefore,color)-winFor(evAfter,color));
+      key=keyFromLoss(loss);
+      text={best:'That is the strongest idea. Well found!',excellent:'Excellent. Nearly as good as the best move.',good:'A good move. It keeps your position healthy.',inaccuracy:'A small slip. There was something better, so try again.',mistake:'That is still a mistake. Look for something stronger.',blunder:'That is a blunder. Start over and look at checks and captures first.'}[key];
+    }else{key='good';text='Here is where that leaves the game: '+evalSentence(evAfter)+'.'}
+    po.ev=evAfter;po.fb={san:m.san,key:key,text:text+' '+evalSentence(evAfter)+' ('+fmtEval(evAfter)+').'};
+    if(r&&r.best){
+      setTimeout(function(){
+        if(S.po!==po)return;
+        var rm=null;
+        try{rm=ch.move({from:r.best.slice(0,2),to:r.best.slice(2,4),promotion:r.best.charAt(4)||undefined})}catch(e){}
+        if(rm)po.last={from:rm.from,to:rm.to};
+        po.busy=false;renderBoard();renderCoach();
+      },500);
+      renderBoard();renderCoach();
+    }else{po.busy=false;renderBoard();renderCoach()}
+  });
+}
+
+/* ---------- share and export ---------- */
+function plainAcc(c,st){return st[c].n?(st[c].sum/st[c].n).toFixed(1):'n/a'}
+function summaryText(){
+  var g=S.game,h=g.headers,st=stats(),me=S.me,opp=me==='w'?'b':'w',L=[];
+  L.push((h.White||'White')+' vs '+(h.Black||'Black')+(h.Result&&h.Result!=='*'?' ('+h.Result+')':''));
+  if(g.openName)L.push('Opening: '+g.openName);
+  L.push('Accuracy: '+(h.White||'White')+' '+plainAcc('w',st)+', '+(h.Black||'Black')+' '+plainAcc('b',st));
+  var cnt=function(c){return ['blunder','mistake','inaccuracy'].map(function(k){return (st[c].c[k]||0)+' '+LBL[k].name.toLowerCase()+(st[c].c[k]===1?'':'s')}).join(', ')};
+  L.push('My side ('+(me==='w'?'White':'Black')+'): '+cnt(me));
+  L.push('Opponent: '+cnt(opp));
+  var slips=[];
+  for(var k=1;k<=g.moves.length;k++){
+    if(g.moves[k-1].color!==me||isBook(k))continue;
+    var l=lossAt(k);if(l!=null&&l>=10)slips.push({k:k,l:l});
+  }
+  slips.sort(function(a,b){return b.l-a.l});
+  if(slips.length){
+    L.push('','Biggest slips:');
+    slips.slice(0,3).forEach(function(s){
+      var bm=betterMove(s.k);
+      L.push('- Move '+moveLabel(s.k)+' ('+LBL[labelAt(s.k)].name.toLowerCase()+', lost '+Math.round(s.l)+' points of winning chances)'+(bm?'. Better: '+bm.san:''));
+    });
+  }
+  var wp=weakPhase();if(wp)L.push('',wp);
+  L.push('','Reviewed with Plain Review.');
+  return L.join('\n');
+}
+function evTag(e){return e.mate!=null?'#'+e.mate:(e.cp/100).toFixed(2)}
+function pgnText(){
+  var g=S.game,h=g.headers,out=[],roster=['Event','Site','Date','Round','White','Black','Result'];
+  roster.forEach(function(k){out.push('['+k+' "'+String(h[k]||'?').replace(/"/g,"'")+'"]')});
+  Object.keys(h).forEach(function(k){if(roster.indexOf(k)<0)out.push('['+k+' "'+String(h[k]).replace(/"/g,"'")+'"]')});
+  var startFull=parseInt((g.startFen.split(' ')[5]||'1'),10)||1,startBlack=g.startFen.split(' ')[1]==='b',t=[],prevC=true,k,m,key,j,num,c,bm;
+  for(k=1;k<=g.moves.length;k++){
+    m=g.moves[k-1];key=labelAt(k);
+    j=k-1+(startBlack?1:0);num=startFull+Math.floor(j/2);
+    if(m.color==='w')t.push(num+'.');else if(prevC||k===1)t.push(num+'...');
+    t.push(m.san+(key==='inaccuracy'?'?!':key==='mistake'?'?':key==='blunder'?'??':''));
+    c=[];
+    if(S.ev[k])c.push('[%eval '+evTag(S.ev[k])+']');
+    if(isSlip(key)){bm=betterMove(k);c.push(LBL[key].name+'.'+(bm?' '+bm.san+' was best.':''))}
+    else if(key==='book'&&g.bookNames[k])c.push(g.bookNames[k]);
+    if(c.length){t.push('{ '+c.join(' ')+' }');prevC=true}else prevC=false;
+  }
+  t.push(h.Result||'*');
+  return out.join('\n')+'\n\n'+t.join(' ')+'\n';
+}
+function copyText(text,okMsg){
+  var out=$('shareOut'),msg=$('shareMsg');
+  var manual=function(){
+    out.value=text;out.hidden=false;out.focus();out.select();
+    var ok=false;try{ok=document.execCommand('copy')}catch(e){}
+    msg.textContent=ok?okMsg:'Copying was blocked here. The text is selected below, so copy it from there.';
+    if(ok)out.hidden=true;
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(function(){out.hidden=true;msg.textContent=okMsg},manual);
+  }else manual();
+}
+function need(){if(!S.game||S.game.error||!S.game.moves.length){$('shareMsg').textContent='Load a game first.';return false}return true}
+
+/* ---------- loading ---------- */
+function gameTitle(g,i){var h=g.headers;return (i+1)+'. '+(h.White||'?')+' vs '+(h.Black||'?')+(h.Date&&h.Date.indexOf('?')<0?' · '+h.Date:'')+(h.Result?' · '+h.Result:'')}
+function loadText(text,isSample){
+  var chunks=splitGames(text),games=[];
+  chunks.forEach(function(c){var g=parseGame(c);if(g.moves.length||g.error)games.push(g)});
+  if(!games.length){setNote('No game found in that text. Make sure it is a PGN file exported from Lichess.','err');return}
+  S.games=games;S.sample=!!isSample;
+  var pick=$('gamepick');
+  if(games.length>1){pick.innerHTML=games.map(function(g,i){return '<option value="'+i+'">'+esc(gameTitle(g,i))+'</option>'}).join('');$('pickRow').hidden=false}
+  else $('pickRow').hidden=true;
+  setGame(0);
+}
+function savedMe(){try{return localStorage.getItem('plainreview.me')||''}catch(e){return ''}}
+function saveMe(n){try{localStorage.setItem('plainreview.me',n)}catch(e){}}
+function setGame(i){
+  stopAuto();S.poTok++;S.po=null;S.thr={};$('shareMsg').textContent='';$('shareOut').hidden=true;
+  S.gi=i;S.game=S.games[i];S.ply=0;S.me='w';S.flip=false;
+  var nm=savedMe(),hd=S.game.headers;
+  if(nm){if(hd.White===nm&&hd.Black!==nm)S.me='w';else if(hd.Black===nm&&hd.White!==nm)S.me='b'}
+  S.run++;Pool.stopAll();
+  if(S.game.error){S.analyzing=false;hideProg();setNote(S.game.error,'err');S.ev=[];S.best=[];renderAll();return}
+  initEval();renderAll();runAnalysis();
+}
+
+/* ---------- events ---------- */
+$('file').addEventListener('change',async function(e){
+  var f=e.target.files&&e.target.files[0];if(!f)return;
+  try{loadText(await f.text(),false)}catch(err){setNote('Could not read that file.','err')}
+  e.target.value='';
+});
+$('pasteBtn').addEventListener('click',function(){var p=$('pastePanel');p.hidden=!p.hidden;if(!p.hidden)$('pasteText').focus()});
+$('pasteGo').addEventListener('click',async function(){
+  var t=$('pasteText').value.trim();
+  if(!t){setNote('Paste a PGN or a Lichess game link first.','err');return}
+  var lm=/^\S+$/.test(t)&&t.match(/lichess\.org\/(?:game\/export\/)?([A-Za-z0-9]{8})/);
+  if(lm){
+    setNote('Downloading the game from Lichess…');
+    try{
+      var r=await fetch('https://lichess.org/game/export/'+lm[1]+'?evals=1&clocks=1&opening=1&literate=1',{headers:{Accept:'application/x-chess-pgn'}});
+      if(!r.ok)throw new Error('http '+r.status);
+      loadText(await r.text(),false);
+    }catch(e){setNote('Could not download that game. Check the link, or download the PGN from Lichess and use Choose PGN file instead.','err')}
+    return;
+  }
+  loadText(t,false);
+});
+$('sampleBtn').addEventListener('click',function(){loadText(SAMPLE,true)});
+$('rerun').addEventListener('click',function(){if(S.game&&!S.game.error){S.po=null;runAnalysis()}});
+$('gamepick').addEventListener('change',function(e){setGame(+e.target.value)});
+$('depth').addEventListener('change',function(){if(S.game&&!S.game.error&&!S.analyzing)setNote('Depth changed. Tap Analyze again to use it.')});
+$('bStart').addEventListener('click',function(){goTo(0)});
+$('bPrev').addEventListener('click',function(){goTo(S.ply-1)});
+$('bNext').addEventListener('click',function(){goTo(S.ply+1)});
+$('bEnd').addEventListener('click',function(){goTo(S.game?S.game.moves.length:0)});
+$('bPlay').addEventListener('click',function(){if(S.auto.on)stopAuto();else startAuto()});
+$('speed').addEventListener('change',function(){if(S.auto.on){clearInterval(S.auto.t);S.auto.t=setInterval(autoTick,+$('speed').value)}});
+$('bFlip').addEventListener('click',function(){S.flip=!S.flip;renderBoard()});
+$('arrowChk').addEventListener('change',function(e){S.showArrow=e.target.checked;renderBoard()});
+$('threatChk').addEventListener('change',function(e){S.showThreat=e.target.checked;renderNav()});
+$('board').addEventListener('click',function(e){
+  if(!S.po)return;
+  var r=this.getBoundingClientRect(),ow=boardFlipped();
+  var fx=Math.floor((e.clientX-r.left)/r.width*8),fy=Math.floor((e.clientY-r.top)/r.height*8);
+  if(fx<0||fx>7||fy<0||fy>7)return;
+  var f=ow?fx:7-fx,rk=ow?7-fy:fy;
+  poClick(String.fromCharCode(97+f)+(rk+1));
+});
+document.addEventListener('click',function(e){
+  var a=e.target.closest&&e.target.closest('[data-act]');
+  if(a){
+    var act=a.getAttribute('data-act');
+    if(act==='try')poStart(S.ply);
+    else if(act==='again'&&S.po)poStart(S.po.k);
+    else if(act==='exit')poExit();
+    return;
+  }
+  var b=e.target.closest&&e.target.closest('[data-ply]');
+  if(b){goTo(+b.getAttribute('data-ply'));return}
+  var m=e.target.closest&&e.target.closest('[data-me]');
+  if(m){S.me=m.getAttribute('data-me');S.flip=false;
+    var hd=S.game&&S.game.headers,nm=hd?(S.me==='w'?hd.White:hd.Black):'';
+    if(nm&&nm!=='?'&&!S.sample)saveMe(nm);
+    S.po=null;renderAll()}
+});
+document.addEventListener('keydown',function(e){
+  var t=e.target&&e.target.tagName;if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT')return;
+  if(e.key==='ArrowLeft'){goTo(S.ply-1);e.preventDefault()}
+  else if(e.key==='ArrowRight'){goTo(S.ply+1);e.preventDefault()}
+  else if(e.key==='Home'){goTo(0);e.preventDefault()}
+  else if(e.key==='End'){goTo(S.game?S.game.moves.length:0);e.preventDefault()}
+});
+$('shSummary').addEventListener('click',function(){if(need())copyText(summaryText(),'Summary copied.')});
+$('shPgn').addEventListener('click',function(){if(need())copyText(pgnText(),'Annotated PGN copied. Paste it into Lichess, ChessBase or any chess app.')});
+$('shFen').addEventListener('click',function(){if(need())copyText(S.po?S.po.ch.fen():fenAt(S.ply),'Position copied.')});
+$('shSave').hidden=false;
+$('shSave').addEventListener('click',function(){
+  if(!need())return;
+  try{
+    var a=document.createElement('a'),h=S.game.headers;
+    a.href=URL.createObjectURL(new Blob([pgnText()],{type:'application/x-chess-pgn'}));
+    a.download=((h.White||'white')+'-vs-'+(h.Black||'black')).replace(/[^\w.-]+/g,'_')+'-reviewed.pgn';
+    document.body.appendChild(a);a.click();a.remove();
+    $('shareMsg').textContent='If no file was saved, use Copy annotated PGN instead.';
+  }catch(e){$('shareMsg').textContent='Saving was blocked here. Use Copy annotated PGN instead.'}
+});
+var gr=$('graph'),dragging=false;
+function graphPly(e){var r=gr.getBoundingClientRect(),n=S.game?S.game.moves.length:0;return Math.round(Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*n)}
+gr.addEventListener('pointerdown',function(e){dragging=true;try{gr.setPointerCapture(e.pointerId)}catch(x){}goTo(graphPly(e))});
+gr.addEventListener('pointermove',function(e){if(dragging)goTo(graphPly(e))});
+gr.addEventListener('pointerup',function(){dragging=false});
+gr.addEventListener('pointercancel',function(){dragging=false});
+['dragover','drop'].forEach(function(ev){document.addEventListener(ev,function(e){
+  if(!e.dataTransfer||!e.dataTransfer.files)return;
+  e.preventDefault();
+  if(ev==='drop'&&e.dataTransfer.files[0]){e.dataTransfer.files[0].text().then(function(t){loadText(t,false)})}
+})});
+
+$('legend').innerHTML=LABELS.map(function(L){return '<dt class="L-'+L.key+'"><span class="sy">'+L.sym+'</span>'+L.name+'</dt><dd>'+L.desc+'</dd>'}).join('');
+
+loadText(SAMPLE,true);
+
+})();
+</script>
+</body></html>
